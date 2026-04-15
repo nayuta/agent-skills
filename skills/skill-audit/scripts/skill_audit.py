@@ -25,7 +25,6 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
-import os
 import re
 import sys
 from pathlib import Path
@@ -277,9 +276,17 @@ def scan_file_for_patterns(path: Path, root: Path) -> List[Finding]:
     return findings
 
 
+_SKIP_DIRS = {"__pycache__", ".git", ".mypy_cache", ".ruff_cache", "node_modules"}
+_SKIP_SUFFIXES = {".pyc", ".pyo", ".pyd"}
+
+
 def collect_files(skill_dir: Path) -> List[Path]:
     files: List[Path] = []
     for path in skill_dir.rglob("*"):
+        if any(part in _SKIP_DIRS for part in path.parts):
+            continue
+        if path.suffix in _SKIP_SUFFIXES:
+            continue
         if path.is_file():
             files.append(path)
     return sorted(files)
