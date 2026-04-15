@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
 		exit 1
 		;;
 	*)
-		if [ "$SCAN_DIR" != "." ]; then
+		if [[ "${SCAN_DIR}" != "." ]]; then
 			echo "Error: only one directory argument is allowed (got extra: $1)" >&2
 			exit 1
 		fi
