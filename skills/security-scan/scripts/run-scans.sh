@@ -5,7 +5,7 @@
 #   --full      Explicitly scan the entire directory tree (default behaviour).
 #               Pass this flag to make the intent clear when calling from a
 #               larger workflow that also uses diff-scoped reviews.
-# Exit code: always 0 (findings reported in output, not via exit code)
+# Exit code: 0 for scan results/findings; non-zero for invalid invocation
 
 set -uo pipefail
 
@@ -25,6 +25,10 @@ while [[ $# -gt 0 ]]; do
 		exit 1
 		;;
 	*)
+		if [ "$SCAN_DIR" != "." ]; then
+			echo "Error: only one directory argument is allowed (got extra: $1)" >&2
+			exit 1
+		fi
 		SCAN_DIR="$1"
 		shift
 		;;

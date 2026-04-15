@@ -176,7 +176,7 @@ bundle-audit check --update
 
 - **security-review** — use after this scan to perform AI-driven code analysis; pass
   `--full` to that skill to review the entire codebase alongside this full scan
-- **CI pipeline** — run as a pre-merge gate; exit code is always 0 (findings in output)
+- **CI pipeline** — run as a pre-merge gate; completed scans exit 0 (findings are reported in output), but invalid arguments or other usage errors may exit non-zero
 
 ## Bundled Resources
 

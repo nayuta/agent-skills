@@ -12,7 +12,7 @@ description: |
   Use before merging code changes, during security-focused PR review, or when
   auditing the security posture of a feature or an entire codebase.
   Pairs with security-scan for tool-based scanning of secrets and dependencies.
-compatibility: Requires git. Language-agnostic — works on any codebase.
+compatibility: Requires git for diff mode (default); full mode (`--full`) works without git using a find-based fallback. Language-agnostic — works on any codebase.
 metadata:
   version: "1.1.0"
   author: nayuta
@@ -343,7 +343,7 @@ const result = db.query("SELECT \* FROM users WHERE id = $1", [req.params.id]);
 - Use this skill for AI reasoning over logic flaws and design issues
 - Together they form a complete pre-merge security gate
 - For a full codebase audit, run both with `--full`:
-  - `security-scan --full` + `security-review --full`
+  - `/security-scan --full` then `/security-review --full`
 
 ## References
 
