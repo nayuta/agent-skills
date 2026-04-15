@@ -123,7 +123,7 @@ echo "**Mode**: ${SCAN_MODE}"
 run_tool "gitleaks" gitleaks detect --no-banner --no-git -v
 
 # semgrep — static analysis with auto-configured OWASP rules
-run_tool "semgrep" semgrep scan --config=auto --quiet --no-git-ignore
+run_tool "semgrep" semgrep scan --config=auto --quiet --no-git-ignore --error
 
 # trivy — vulnerability and misconfiguration scanning
 run_tool "trivy" trivy fs --severity HIGH,CRITICAL --quiet .
