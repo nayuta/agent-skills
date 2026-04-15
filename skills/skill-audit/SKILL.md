@@ -34,7 +34,7 @@ Run the bundled auditor from the repository root:
 python skills/skill-audit/scripts/skill_audit.py <skill-path> --surface claude-code
 ```
 
-For agent-API mode (strict, requires `name` and `description`):
+For agent-api mode (strict, requires `name` and `description`):
 
 ```bash
 python skills/skill-audit/scripts/skill_audit.py <skill-path> --surface agent-api

@@ -124,13 +124,31 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, Any], str, bool]:
     body = "\n".join(lines[end_idx + 1 :])
 
     if yaml is None:
-        # Minimal fallback parser for simple key: value lines
+        # Minimal fallback parser for simple key: value lines only.
+        # Detect block scalars (|, >, |-) and nested mappings (indented lines)
+        # which this parser cannot handle reliably.
         data: Dict[str, Any] = {}
         for line in raw_frontmatter.splitlines():
-            if ":" not in line:
+            stripped = line.rstrip()
+            # Indented lines indicate nested mappings or block scalar content
+            if stripped and stripped[0] == " ":
+                return (
+                    {"__parse_error__": "frontmatter contains nested mappings or block scalars; install PyYAML for full support"},
+                    body,
+                    True,
+                )
+            if ":" not in stripped:
                 continue
-            k, v = line.split(":", 1)
-            data[k.strip()] = v.strip().strip('"').strip("'")
+            k, v = stripped.split(":", 1)
+            v_stripped = v.strip()
+            # Block scalar indicators on a key line (e.g. "description: |")
+            if v_stripped in ("|", ">", "|-", ">-", "|+", ">+"):
+                return (
+                    {"__parse_error__": "frontmatter contains block scalars; install PyYAML for full support"},
+                    body,
+                    True,
+                )
+            data[k.strip()] = v_stripped.strip('"').strip("'")
         return data, body, True
 
     try:
@@ -255,7 +273,10 @@ def validate_links(skill_dir: Path, body: str) -> List[Finding]:
 def scan_file_for_patterns(path: Path, root: Path) -> List[Finding]:
     findings: List[Finding] = []
     text = read_text(path)
-    rel = str(path)
+    try:
+        rel = str(path.relative_to(root))
+    except ValueError:
+        rel = str(path)
     lines = text.splitlines()
 
     for i, line in enumerate(lines, start=1):
@@ -269,15 +290,30 @@ def scan_file_for_patterns(path: Path, root: Path) -> List[Finding]:
             findings.append(Finding("ERROR", "hardcoded_secret", "Potential hardcoded secret found.", rel, i))
         if ADVERSARIAL_INSTRUCTION_RE.search(line):
             findings.append(Finding("ERROR", "adversarial_instruction", "Potential adversarial or concealment instruction found.", rel, i))
-        if "allowed-tools:" in line and "*" in line:
-            findings.append(Finding("WARN", "broad_allowed_tools", "Wildcard found in allowed-tools; review for excessive privilege.", rel, i))
+        if re.search(r"allowed-tools:\s*\*\s*$", line):
+            findings.append(Finding("WARN", "broad_allowed_tools", "Bare wildcard (*) in allowed-tools grants all tools; review for excessive privilege.", rel, i))
         if re.search(r"\b(today|yesterday|tomorrow|current policy|latest)\b", line, re.IGNORECASE):
             findings.append(Finding("INFO", "time_sensitive_content", "Time-sensitive wording found; consider externalizing volatile content.", rel, i))
     return findings
 
 
 _SKIP_DIRS = {"__pycache__", ".git", ".mypy_cache", ".ruff_cache", "node_modules"}
-_SKIP_SUFFIXES = {".pyc", ".pyo", ".pyd"}
+_SKIP_SUFFIXES = {
+    # Compiled Python
+    ".pyc", ".pyo", ".pyd",
+    # Images
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".svg", ".webp", ".tiff",
+    # Archives and binaries
+    ".gz", ".bz2", ".xz", ".zip", ".tar", ".tgz", ".whl", ".egg",
+    ".so", ".dylib", ".dll", ".exe", ".bin", ".a", ".o",
+    # Audio / video
+    ".mp3", ".mp4", ".wav", ".ogg", ".mov", ".avi",
+    # Fonts
+    ".woff", ".woff2", ".ttf", ".otf", ".eot",
+    # Database / data blobs
+    ".db", ".sqlite", ".pkl", ".parquet", ".npy", ".npz",
+}
+_MAX_FILE_SIZE = 1024 * 1024  # 1 MB
 
 
 def collect_files(skill_dir: Path) -> List[Path]:
@@ -285,10 +321,13 @@ def collect_files(skill_dir: Path) -> List[Path]:
     for path in skill_dir.rglob("*"):
         if any(part in _SKIP_DIRS for part in path.parts):
             continue
-        if path.suffix in _SKIP_SUFFIXES:
+        if path.suffix.lower() in _SKIP_SUFFIXES:
             continue
-        if path.is_file():
-            files.append(path)
+        if not path.is_file():
+            continue
+        if path.stat().st_size > _MAX_FILE_SIZE:
+            continue
+        files.append(path)
     return sorted(files)
 
 
