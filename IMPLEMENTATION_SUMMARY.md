@@ -115,7 +115,7 @@ Failed: 0
 - **security-scan**: 100 (only INFO-level time_sensitive_content findings, which don't reduce score)
 
 ## Ready for Review
-- Worktree: `worktrees/FEL-330`
+- Worktree: `/path/to/agent-skills/worktrees/FEL-330`
 - Branch: `FEL-330`
 - All tests passing
 - All validation checks passed

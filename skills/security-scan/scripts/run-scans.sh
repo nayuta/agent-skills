@@ -82,13 +82,13 @@ run_tool() {
 	if [[ -z ${output} ]]; then
 		echo "No issues found."
 	else
+		echo '```'
+		echo "${output}"
+		echo '```'
 		# Only count as findings if tool exited non-zero (indicates actual issues)
 		if [[ ${exit_code} -ne 0 ]]; then
 			TOOLS_WITH_FINDINGS=$((TOOLS_WITH_FINDINGS + 1))
 		fi
-		echo '```'
-		echo "${output}"
-		echo '```'
 	fi
 	echo ""
 }

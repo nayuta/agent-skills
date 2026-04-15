@@ -27,7 +27,11 @@ if [[ ! -f "skills/security-review/README.md" ]]; then
     echo "✗ FAIL: README.md does not exist"
     FAILED_TESTS=$((FAILED_TESTS + 1))
 else
-    LINE_COUNT=$(wc -l < skills/security-review/README.md)
+    if [[ -f "skills/security-review/README.md" ]]; then
+        LINE_COUNT=$(wc -l < skills/security-review/README.md)
+    else
+        LINE_COUNT=0
+    fi
     if [[ ${LINE_COUNT} -le 40 ]]; then
         echo "✓ PASS: README.md has ${LINE_COUNT} lines (<= 40)"
         PASSED_TESTS=$((PASSED_TESTS + 1))
