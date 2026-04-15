@@ -10,6 +10,13 @@ description: |
   secrets in git history, or validating security posture before commits or releases.
   Pairs with security-review for a complete security workflow.
 allowed-tools: Bash
+compatibility: |
+  Requires bash. Optional external tools: gitleaks, semgrep, trivy, npm, bandit,
+  pip-audit, gosec, govulncheck, cargo-audit, bundler-audit. Missing tools are
+  skipped gracefully.
+metadata:
+  version: "1.0.0"
+  author: nayuta
 ---
 
 # Security Scan
