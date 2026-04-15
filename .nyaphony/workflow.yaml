@@ -17,10 +17,10 @@ issue_tracker:
     - Canceled
   state_labels:
     enabled: true
-    claimed: "agent-skills:claimed"
-    running: "agent-skills:running"
-    retry: "agent-skills:retry"
-    failed: "agent-skills:failed"
+    claimed: "nyaphony:claimed"
+    running: "nyaphony:running"
+    retry: "nyaphony:retry"
+    failed: "nyaphony:failed"
 
 notifications:
   slack:
