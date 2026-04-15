@@ -58,21 +58,25 @@ Do not read files that are not referenced — they are background context only.
 Assess four areas that static checks cannot cover:
 
 #### Discovery problems
+
 - Is the `description` narrow enough to avoid false triggers?
 - Does it overlap significantly with adjacent skills in the same directory?
 - Would a model reliably select this skill for its intended use cases?
 
 #### Isolation problems
+
 - Are all referenced files present and accessible?
 - Does the skill rely on environment assumptions not stated in `compatibility`?
 - Are external dependencies (APIs, CLIs, credentials) documented?
 
 #### Coexistence problems
+
 - Does this skill's description overlap with other skills in the directory?
 - Could two skills be triggered simultaneously causing conflict?
 - Are trigger boundaries clear and mutually exclusive where needed?
 
 #### Efficiency problems
+
 - Is `SKILL.md` under 500 lines? (warn above this threshold)
 - Is large reference content in separate files rather than inline?
 - Does the skill regenerate the same code on every run that could be a script?
@@ -136,26 +140,26 @@ If the score is 100 and no AI judgment issues are found, report:
 
 ## Static Checks Covered
 
-| Category              | Checks                                                                     |
-| --------------------- | -------------------------------------------------------------------------- |
-| Structure             | `SKILL.md` presence, YAML frontmatter parseable                            |
-| Metadata              | `name` format (`^[a-z0-9-]{1,64}$`), reserved words, `description` length |
-| Body                  | Non-empty, under 500 lines                                                 |
-| Links                 | Local markdown links resolve to existing files                             |
-| Secrets               | Hardcoded API keys, tokens, passwords                                      |
-| Network access        | External network calls embedded in skill instructions                      |
-| Path traversal        | Dot-dot-slash escapes in skill instructions                                |
-| Adversarial content   | Instructions designed to conceal actions or circumvent safety controls     |
-| Portability           | Windows-style paths                                                        |
-| Privilege             | Wildcard `allowed-tools`                                                   |
-| Time-sensitive wording | `today`, `yesterday`, `latest`, `current policy`                           |
+| Category               | Checks                                                                    |
+| ---------------------- | ------------------------------------------------------------------------- |
+| Structure              | `SKILL.md` presence, YAML frontmatter parseable                           |
+| Metadata               | `name` format (`^[a-z0-9-]{1,64}$`), reserved words, `description` length |
+| Body                   | Non-empty, under 500 lines                                                |
+| Links                  | Local markdown links resolve to existing files                            |
+| Secrets                | Hardcoded API keys, tokens, passwords                                     |
+| Network access         | External network calls embedded in skill instructions                     |
+| Path traversal         | Dot-dot-slash escapes in skill instructions                               |
+| Adversarial content    | Instructions designed to conceal actions or circumvent safety controls    |
+| Portability            | Windows-style paths                                                       |
+| Privilege              | Wildcard `allowed-tools`                                                  |
+| Time-sensitive wording | `today`, `yesterday`, `latest`, `current policy`                          |
 
 ## Bundled Resources
 
-| File                      | Purpose                                           |
-| ------------------------- | ------------------------------------------------- |
-| `scripts/skill_audit.py`  | Static auditor — run directly or import as module |
-| `evals/example-evals.yaml`| Example evaluation schema for dynamic testing     |
+| File                       | Purpose                                           |
+| -------------------------- | ------------------------------------------------- |
+| `scripts/skill_audit.py`   | Static auditor — run directly or import as module |
+| `evals/example-evals.yaml` | Example evaluation schema for dynamic testing     |
 
 ## Integration
 

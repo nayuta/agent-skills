@@ -1,15 +1,18 @@
 #!/bin/bash
 # Script: run-scans.sh
 # Runs available security scanning tools and outputs structured markdown.
-# Usage: run-scans.sh [--full] [directory]
+# Usage: run-scans.sh [--full] [--strict] [directory]
 #   --full      Explicitly scan the entire directory tree (default behaviour).
 #               Pass this flag to make the intent clear when calling from a
 #               larger workflow that also uses diff-scoped reviews.
-# Exit code: 0 for scan results/findings; non-zero for invalid invocation
+#   --strict    Exit with non-zero code when findings are detected.
+#               Useful for CI gates and pre-commit hooks.
+# Exit code: 0 for scan results/findings; non-zero for invalid invocation or findings (with --strict)
 
 set -uo pipefail
 
 FULL_SCAN=false
+STRICT_MODE=false
 SCAN_DIR="."
 
 # --- Argument parsing ---
@@ -18,6 +21,10 @@ while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--full)
 		FULL_SCAN=true
+		shift
+		;;
+	--strict)
+		STRICT_MODE=true
 		shift
 		;;
 	-*)
@@ -181,5 +188,12 @@ fi
 echo ""
 echo "---"
 echo "*Scan complete. Review findings above for false positives before acting.*"
+
+# Exit with non-zero code in strict mode if findings were detected
+if [[ "${STRICT_MODE}" == "true" ]] && [[ ${TOOLS_WITH_FINDINGS} -gt 0 ]]; then
+	echo ""
+	echo "⚠️  STRICT MODE: ${TOOLS_WITH_FINDINGS} tool(s) reported findings. Exiting with code 1."
+	exit 1
+fi
 
 exit 0

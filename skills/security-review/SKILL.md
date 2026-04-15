@@ -13,6 +13,7 @@ description: |
   auditing the security posture of a feature or an entire codebase.
   Pairs with security-scan for tool-based scanning of secrets and dependencies.
 compatibility: Requires git for diff mode (default); full mode (`--full`) works without git using a find-based fallback. Language-agnostic — works on any codebase.
+allowed-tools: Bash, Read, Glob, Grep
 metadata:
   version: "1.1.0"
   author: nayuta
@@ -27,10 +28,10 @@ AI reasoning. Produces a confidence-filtered report with actionable remediation.
 
 ## Scan Modes
 
-| Mode | Flag | Source of files to review |
-| ---- | ---- | ------------------------- |
+| Mode           | Flag     | Source of files to review                        |
+| -------------- | -------- | ------------------------------------------------ |
 | Diff (default) | _(none)_ | Files changed in the current branch (`git diff`) |
-| Full codebase | `--full` | All tracked source files (`git ls-files`) |
+| Full codebase  | `--full` | All tracked source files (`git ls-files`)        |
 
 Use **diff mode** (default) for pre-merge reviews to focus on what changed.
 Use **`--full`** when onboarding a new codebase, performing a periodic audit,
@@ -96,6 +97,7 @@ lock files, minified assets). Focus on files likely to contain executable logic:
 source code, configuration templates, infrastructure definitions, and scripts.
 
 If the file set is large (> 200 files), prioritise by security sensitivity:
+
 1. Auth, session, and permission handlers
 2. API route handlers and controllers
 3. Database query builders and ORMs
@@ -290,7 +292,7 @@ Otherwise, use this format:
 
 **Date**: <ISO 8601>
 **Mode**: diff | full
-**Branch**: <branch-name>  ← omit in full mode if not on a feature branch
+**Branch**: <branch-name> ← omit in full mode if not on a feature branch
 **Files reviewed**: N
 **High-confidence findings**: N (Critical: N | High: N | Medium: N)
 
