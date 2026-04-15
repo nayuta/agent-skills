@@ -1,0 +1,152 @@
+#!/bin/bash
+# Script: run-scans.sh
+# Runs available security scanning tools and outputs structured markdown.
+# Usage: run-scans.sh [directory]
+# Exit code: always 0 (findings reported in output, not via exit code)
+
+set -uo pipefail
+
+SCAN_DIR="${1:-.}"
+cd "${SCAN_DIR}" || exit 0
+
+TOOLS_RUN=0
+TOOLS_SKIPPED=0
+TOOLS_WITH_FINDINGS=0
+SKIPPED_TOOLS=()
+
+# --- Helpers ---
+
+run_tool() {
+	local name="$1"
+	shift
+	local cmd=("$@")
+
+	if ! command -v "${cmd[0]}" >/dev/null 2>&1; then
+		TOOLS_SKIPPED=$((TOOLS_SKIPPED + 1))
+		SKIPPED_TOOLS+=("${name}")
+		echo ""
+		echo "## Tool: ${name}"
+		echo ""
+		echo "**Status**: Skipped (not installed)"
+		echo ""
+		return
+	fi
+
+	TOOLS_RUN=$((TOOLS_RUN + 1))
+	echo ""
+	echo "## Tool: ${name}"
+	echo ""
+	echo "**Status**: Ran"
+	echo ""
+
+	local output
+	output=$("${cmd[@]}" 2>&1) || true
+
+	if [[ -z ${output} ]]; then
+		echo "No issues found."
+	else
+		TOOLS_WITH_FINDINGS=$((TOOLS_WITH_FINDINGS + 1))
+		echo '```'
+		echo "${output}"
+		echo '```'
+	fi
+	echo ""
+}
+
+is_skipped() {
+	local needle="$1"
+	local item
+	for item in "${SKIPPED_TOOLS[@]}"; do
+		[[ ${item} == "${needle}" ]] && return 0
+	done
+	return 1
+}
+
+# --- Header ---
+
+SCAN_PWD="$(pwd)"
+SCAN_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+echo "# Security Scan Results"
+echo ""
+echo "**Directory**: \`${SCAN_PWD}\`"
+echo "**Date**: ${SCAN_DATE}"
+
+# --- Universal Scanners ---
+
+# gitleaks — secret detection in git history and working tree
+run_tool "gitleaks" gitleaks detect --no-banner --no-git -v
+
+# semgrep — static analysis with auto-configured OWASP rules
+run_tool "semgrep" semgrep scan --config=auto --quiet --no-git-ignore
+
+# trivy — vulnerability and misconfiguration scanning
+run_tool "trivy" trivy fs --severity HIGH,CRITICAL --quiet .
+
+# --- Language-Specific Scanners ---
+
+# Node.js / TypeScript
+if [[ -f "package.json" ]]; then
+	run_tool "npm audit" npm audit --omit=dev
+fi
+
+# Python
+if [[ -f "requirements.txt" ]] || [[ -f "pyproject.toml" ]] || [[ -f "setup.py" ]]; then
+	run_tool "bandit" bandit -r . -q --severity-level medium
+	run_tool "pip-audit" pip-audit
+fi
+
+# Go
+if [[ -f "go.mod" ]]; then
+	run_tool "gosec" gosec -quiet ./...
+	run_tool "govulncheck" govulncheck ./...
+fi
+
+# Rust
+if [[ -f "Cargo.toml" ]]; then
+	run_tool "cargo audit" cargo audit
+fi
+
+# Ruby
+if [[ -f "Gemfile" ]]; then
+	run_tool "bundle-audit" bundle-audit check --update
+fi
+
+# --- Summary ---
+
+echo "---"
+echo ""
+echo "## Summary"
+echo ""
+echo "- **Tools run**: ${TOOLS_RUN}"
+echo "- **Tools skipped**: ${TOOLS_SKIPPED}"
+echo "- **Tools with findings**: ${TOOLS_WITH_FINDINGS}"
+
+if [[ ${#SKIPPED_TOOLS[@]} -gt 0 ]]; then
+	echo ""
+	echo "### Install missing tools"
+	echo ""
+	for tool in gitleaks semgrep trivy bandit pip-audit gosec govulncheck "cargo audit" bundle-audit; do
+		if is_skipped "${tool}"; then
+			# shellcheck disable=SC2016
+			case "${tool}" in
+			gitleaks) echo '- `gitleaks`: `brew install gitleaks`' ;;
+			semgrep) echo '- `semgrep`: `brew install semgrep` or `pip install semgrep`' ;;
+			trivy) echo '- `trivy`: `brew install trivy`' ;;
+			bandit) echo '- `bandit`: `pip install bandit`' ;;
+			pip-audit) echo '- `pip-audit`: `pip install pip-audit`' ;;
+			gosec) echo '- `gosec`: `go install github.com/securego/gosec/v2/cmd/gosec@latest`' ;;
+			govulncheck) echo '- `govulncheck`: `go install golang.org/x/vuln/cmd/govulncheck@latest`' ;;
+			"cargo audit") echo '- `cargo audit`: `cargo install cargo-audit`' ;;
+			bundle-audit) echo '- `bundle-audit`: `gem install bundler-audit`' ;;
+			*) ;;
+			esac
+		fi
+	done
+fi
+
+echo ""
+echo "---"
+echo "*Scan complete. Review findings above for false positives before acting.*"
+
+exit 0

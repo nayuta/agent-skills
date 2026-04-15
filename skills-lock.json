@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "mend-agent-rules": {
+      "source": "ubie-inc/agent-skills",
+      "sourceType": "github",
+      "computedHash": "571ae9f9896cc18f3d85874f0a303f211909b448d160d08a73f343fda066e748"
+    },
+    "mend-docs": {
+      "source": "ubie-inc/agent-skills",
+      "sourceType": "github",
+      "computedHash": "751f7091a6b0b6c720c1a697884d046e9136fadd0a71830a2ec66c7cf6adcacf"
+    },
+    "validate-fix": {
+      "source": "ubie-inc/agent-skills",
+      "sourceType": "github",
+      "computedHash": "cc0dc31214389ed70104148f2c98f946b1f1901d4d93984cd95685a1b20b8a00"
+    }
+  }
+}

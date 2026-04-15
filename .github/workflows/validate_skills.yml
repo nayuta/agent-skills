@@ -1,0 +1,22 @@
+name: Validate Agent Skills
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: validate-skills-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: read-all
+
+jobs:
+  validate-skills:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Validate Skills
+        run: |
+          uv run bash dev/validate_skills.sh
