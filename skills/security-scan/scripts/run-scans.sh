@@ -1,12 +1,40 @@
 #!/bin/bash
 # Script: run-scans.sh
 # Runs available security scanning tools and outputs structured markdown.
-# Usage: run-scans.sh [directory]
-# Exit code: always 0 (findings reported in output, not via exit code)
+# Usage: run-scans.sh [--full] [directory]
+#   --full      Explicitly scan the entire directory tree (default behaviour).
+#               Pass this flag to make the intent clear when calling from a
+#               larger workflow that also uses diff-scoped reviews.
+# Exit code: 0 for scan results/findings; non-zero for invalid invocation
 
 set -uo pipefail
 
-SCAN_DIR="${1:-.}"
+FULL_SCAN=false
+SCAN_DIR="."
+
+# --- Argument parsing ---
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--full)
+		FULL_SCAN=true
+		shift
+		;;
+	-*)
+		echo "Unknown option: $1" >&2
+		exit 1
+		;;
+	*)
+		if [[ "${SCAN_DIR}" != "." ]]; then
+			echo "Error: only one directory argument is allowed (got extra: $1)" >&2
+			exit 1
+		fi
+		SCAN_DIR="$1"
+		shift
+		;;
+	esac
+done
+
 cd "${SCAN_DIR}" || exit 0
 
 TOOLS_RUN=0
@@ -66,11 +94,16 @@ is_skipped() {
 
 SCAN_PWD="$(pwd)"
 SCAN_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+SCAN_MODE="full"
+if [[ "${FULL_SCAN}" == "true" ]]; then
+	SCAN_MODE="full (--full)"
+fi
 
 echo "# Security Scan Results"
 echo ""
 echo "**Directory**: \`${SCAN_PWD}\`"
 echo "**Date**: ${SCAN_DATE}"
+echo "**Mode**: ${SCAN_MODE}"
 
 # --- Universal Scanners ---
 
