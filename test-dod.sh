@@ -42,12 +42,14 @@ else
 fi
 
 # Check that duplicated tables are removed
-if grep -q "Vulnerability categories" skills/security-review/README.md; then
-    echo "✗ FAIL: Duplicated 'Vulnerability categories' table still exists"
-    FAILED_TESTS=$((FAILED_TESTS + 1))
-else
-    echo "✓ PASS: Duplicated tables removed"
-    PASSED_TESTS=$((PASSED_TESTS + 1))
+if [[ -f "skills/security-review/README.md" ]]; then
+    if grep -q "Vulnerability categories" skills/security-review/README.md; then
+        echo "✗ FAIL: Duplicated 'Vulnerability categories' table still exists"
+        FAILED_TESTS=$((FAILED_TESTS + 1))
+    else
+        echo "✓ PASS: Duplicated tables removed"
+        PASSED_TESTS=$((PASSED_TESTS + 1))
+    fi
 fi
 echo ""
 
