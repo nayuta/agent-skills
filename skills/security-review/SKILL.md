@@ -1,18 +1,20 @@
 ---
 name: security-review
 description: |
-  Comprehensive AI-driven security code review of changes in the current branch.
+  Comprehensive AI-driven security code review. By default reviews only the
+  changes in the current branch (git diff). Pass --full to review the entire
+  codebase instead of just the diff.
   Performs multi-phase analysis: repository context research, systematic vulnerability
   scanning across 8 categories (secrets, injection, authentication, cryptography, input
   validation, data exposure, dependency risks, configuration), false positive filtering,
   and a structured report with severity ratings and remediation guidance.
   Only reports high-confidence findings (confidence >= 8/10) to minimize noise.
   Use before merging code changes, during security-focused PR review, or when
-  auditing the security posture of a feature. Pairs with security-scan for
-  tool-based scanning of secrets and dependencies.
+  auditing the security posture of a feature or an entire codebase.
+  Pairs with security-scan for tool-based scanning of secrets and dependencies.
 compatibility: Requires git. Language-agnostic — works on any codebase.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   author: nayuta
 ---
 
@@ -20,21 +22,34 @@ metadata:
 
 ## Purpose
 
-Systematically analyze code changes for security vulnerabilities using structured
+Systematically analyze code for security vulnerabilities using structured
 AI reasoning. Produces a confidence-filtered report with actionable remediation.
+
+## Scan Modes
+
+| Mode | Flag | Source of files to review |
+| ---- | ---- | ------------------------- |
+| Diff (default) | _(none)_ | Files changed in the current branch (`git diff`) |
+| Full codebase | `--full` | All tracked source files (`git ls-files`) |
+
+Use **diff mode** (default) for pre-merge reviews to focus on what changed.
+Use **`--full`** when onboarding a new codebase, performing a periodic audit,
+or when no branch diff is available.
 
 ## Workflow
 
 ### Phase 1: Repository Context
 
-Before analyzing diff content, build context to reduce false positives:
+Before analyzing file content, build context to reduce false positives:
 
 1. Read key project files: `CLAUDE.md`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md`
 2. Identify tech stack, frameworks, ORM, auth library, and HTTP server
 3. Note existing security patterns (middleware, validation helpers, auth guards)
 4. Identify sensitive file types for this project (config, migrations, API handlers)
 
-### Phase 2: Gather Changes
+### Phase 2: Gather Files to Review
+
+#### Default mode (diff only)
 
 Collect the diff to review:
 
@@ -57,9 +72,41 @@ Also note which files were changed:
 git diff --name-only origin/main...HEAD
 ```
 
+#### Full mode (`--full`)
+
+Collect all tracked source files instead of the diff:
+
+```bash
+git ls-files
+```
+
+If the repository is not a git repo, use:
+
+```bash
+find . -type f \
+  ! -path '*/.git/*' \
+  ! -path '*/node_modules/*' \
+  ! -path '*/__pycache__/*' \
+  ! -path '*/vendor/*' \
+  ! -path '*/.venv/*'
+```
+
+Filter out binary, generated, and non-source files (images, compiled artifacts,
+lock files, minified assets). Focus on files likely to contain executable logic:
+source code, configuration templates, infrastructure definitions, and scripts.
+
+If the file set is large (> 200 files), prioritise by security sensitivity:
+1. Auth, session, and permission handlers
+2. API route handlers and controllers
+3. Database query builders and ORMs
+4. Configuration files and environment templates
+5. Remaining source files
+
+Note which files are being reviewed in the Phase 5 report header.
+
 ### Phase 3: Vulnerability Analysis
 
-Systematically check each changed file against all 8 categories below.
+Systematically check each reviewed file against all 8 categories below.
 Work through each category in order. For each finding, record:
 
 - **Category** and sub-type
@@ -210,7 +257,7 @@ For each potential finding, apply the confidence score:
 
 Factors that increase confidence:
 
-- User input flows directly to sink with no sanitization in the changed code
+- User input flows directly to sink with no sanitization in the reviewed code
 - New code, not an existing pattern (reduces "was already there" dismissals)
 - Impact is high (RCE, auth bypass, data exfiltration)
 
@@ -228,10 +275,11 @@ If there are no findings with confidence ≥ 8:
 ## Security Review
 
 **Date**: <ISO 8601>
+**Mode**: diff | full
 **Files reviewed**: N
 **Findings**: None above confidence threshold.
 
-No high-confidence security vulnerabilities found in the reviewed changes.
+No high-confidence security vulnerabilities found in the reviewed files.
 Run security-scan for tool-based secret and dependency checks.
 ```
 
@@ -241,7 +289,8 @@ Otherwise, use this format:
 ## Security Review
 
 **Date**: <ISO 8601>
-**Branch**: <branch-name>
+**Mode**: diff | full
+**Branch**: <branch-name>  ← omit in full mode if not on a feature branch
 **Files reviewed**: N
 **High-confidence findings**: N (Critical: N | High: N | Medium: N)
 
@@ -293,6 +342,8 @@ const result = db.query("SELECT \* FROM users WHERE id = $1", [req.params.id]);
 - Run **security-scan** first to catch secrets and known CVEs in dependencies
 - Use this skill for AI reasoning over logic flaws and design issues
 - Together they form a complete pre-merge security gate
+- For a full codebase audit, run both with `--full`:
+  - `security-scan --full` + `security-review --full`
 
 ## References
 

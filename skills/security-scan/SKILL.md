@@ -6,6 +6,8 @@ description: |
   trivy, npm audit, bandit, pip-audit, gosec, govulncheck, cargo audit,
   bundle-audit) and activates language-specific scanners based on project files.
   Gracefully skips missing tools and provides installation hints.
+  By default scans the entire target directory. Pass --full to make the intent
+  explicit (useful in workflows that combine full-codebase and diff-only scans).
   Use when running security scans, checking for vulnerabilities, detecting leaked
   secrets in git history, or validating security posture before commits or releases.
   Pairs with security-review for a complete security workflow.
@@ -15,7 +17,7 @@ compatibility: |
   pip-audit, gosec, govulncheck, cargo-audit, bundler-audit. Missing tools are
   skipped gracefully.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   author: nayuta
 ---
 
@@ -27,6 +29,17 @@ Auto-detect and run available security scanning tools, producing a structured
 markdown report. Language-specific scanners activate automatically based on
 detected project files. Missing tools are skipped with installation guidance.
 
+## Scan Modes
+
+| Mode | Flag | Behavior |
+| ---- | ---- | -------- |
+| Full scan (default) | _(none)_ | Scans the entire target directory |
+| Full scan (explicit) | `--full` | Same as default; use to make intent explicit in scripts or CI |
+
+Both modes scan the full directory tree. Pass `--full` when calling from a workflow
+that combines this skill with diff-scoped reviews (e.g., `security-review`) so the
+output header clearly identifies the scan scope.
+
 ## Workflow
 
 ### Step 1: Run the Scanner
@@ -34,13 +47,17 @@ detected project files. Missing tools are skipped with installation guidance.
 Execute the bundled script from the project root:
 
 ```bash
+# Default: scan full codebase
 bash skills/security-scan/scripts/run-scans.sh [target-directory]
+
+# Explicit full scan (identical result, intent is documented in output)
+bash skills/security-scan/scripts/run-scans.sh --full [target-directory]
 ```
 
 If the skills directory is elsewhere, use the absolute path:
 
 ```bash
-bash ~/.claude/skills/security-scan/scripts/run-scans.sh [target-directory]
+bash ~/.claude/skills/security-scan/scripts/run-scans.sh [--full] [target-directory]
 ```
 
 If the script is unavailable, run tools manually per the [Manual Scan](#manual-scan) section.
@@ -80,6 +97,7 @@ Present findings in this structure:
 
 **Date**: <ISO 8601>
 **Directory**: <path>
+**Mode**: full | full (--full)
 **Tools run**: N | **Tools skipped**: N | **Tools with findings**: N
 
 ### Confirmed Findings
@@ -156,7 +174,8 @@ bundle-audit check --update
 
 ## Integration
 
-- **security-review** — use after this scan to perform AI-driven code analysis
+- **security-review** — use after this scan to perform AI-driven code analysis; pass
+  `--full` to that skill to review the entire codebase alongside this full scan
 - **CI pipeline** — run as a pre-merge gate; exit code is always 0 (findings in output)
 
 ## Bundled Resources
