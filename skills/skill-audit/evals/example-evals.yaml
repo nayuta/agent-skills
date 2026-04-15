@@ -1,0 +1,37 @@
+skill: example-skill
+surface: claude-code
+models:
+  - claude-haiku
+  - claude-sonnet
+  - claude-opus
+
+cases:
+  - id: trigger-01
+    bucket: should-trigger
+    prompt: "Analyze this spreadsheet and produce a pivot-table summary."
+    expect:
+      skill_selected: true
+      must_include_any:
+        - "pivot"
+        - "spreadsheet"
+
+  - id: no-trigger-01
+    bucket: should-not-trigger
+    prompt: "Explain what a spreadsheet is."
+    expect:
+      skill_selected: false
+
+  - id: edge-01
+    bucket: ambiguous
+    prompt: "Compare CSV and xlsx trade-offs for an ETL pipeline."
+    expect:
+      notes: "May or may not trigger depending on description breadth. Track consistency."
+
+metrics:
+  trigger_accuracy: true
+  non_trigger_accuracy: true
+  output_quality_llm_grade: true
+  latency_ms: true
+  input_tokens: true
+  output_tokens: true
+  tool_calls: true
