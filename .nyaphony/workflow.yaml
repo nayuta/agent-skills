@@ -27,7 +27,7 @@ notifications:
 
 logging:
   level: debug
-  file_path: ./agent-skills.log
+  file_path: ./nyaphony.log
   use_stdout: true
 
 coding_agent:
