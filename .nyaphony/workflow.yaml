@@ -1,5 +1,3 @@
-$schema: ../workflow.schema.json
-
 server:
   port: 18081
 
