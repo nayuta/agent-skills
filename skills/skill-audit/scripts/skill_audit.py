@@ -279,8 +279,8 @@ def scan_file_for_patterns(path: Path, root: Path) -> List[Finding]:
         rel = str(path)
     lines = text.splitlines()
 
-    # Determine if this is a security-domain skill by checking the root path
-    is_security_skill = "security" in str(root).lower()
+    # Determine if this is a security-domain skill by checking the skill name
+    is_security_skill = root.name.startswith("security-")
 
     for i, line in enumerate(lines, start=1):
         if WINDOWS_PATH_RE.search(line):

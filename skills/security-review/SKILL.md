@@ -13,7 +13,7 @@ description: |
   auditing the security posture of a feature or an entire codebase.
   Pairs with security-scan for tool-based scanning of secrets and dependencies.
 compatibility: Requires git for diff mode (default); full mode (`--full`) works without git using a find-based fallback. Language-agnostic — works on any codebase.
-allowed-tools: Bash, Read, Glob, Grep
+allowed-tools: Bash Read Glob Grep
 metadata:
   version: "1.1.0"
   author: nayuta

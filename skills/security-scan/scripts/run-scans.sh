@@ -75,12 +75,17 @@ run_tool() {
 	echo ""
 
 	local output
-	output=$("${cmd[@]}" 2>&1) || true
+	local exit_code
+	output=$("${cmd[@]}" 2>&1) || exit_code=$?
+	exit_code=${exit_code:-0}
 
 	if [[ -z ${output} ]]; then
 		echo "No issues found."
 	else
-		TOOLS_WITH_FINDINGS=$((TOOLS_WITH_FINDINGS + 1))
+		# Only count as findings if tool exited non-zero (indicates actual issues)
+		if [[ ${exit_code} -ne 0 ]]; then
+			TOOLS_WITH_FINDINGS=$((TOOLS_WITH_FINDINGS + 1))
+		fi
 		echo '```'
 		echo "${output}"
 		echo '```'
@@ -192,7 +197,7 @@ echo "*Scan complete. Review findings above for false positives before acting.*"
 # Exit with non-zero code in strict mode if findings were detected
 if [[ "${STRICT_MODE}" == "true" ]] && [[ ${TOOLS_WITH_FINDINGS} -gt 0 ]]; then
 	echo ""
-	echo "⚠️  STRICT MODE: ${TOOLS_WITH_FINDINGS} tool(s) reported findings. Exiting with code 1."
+	echo "WARNING: STRICT MODE: ${TOOLS_WITH_FINDINGS} tool(s) reported findings. Exiting with code 1."
 	exit 1
 fi
 

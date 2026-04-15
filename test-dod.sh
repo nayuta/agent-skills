@@ -23,13 +23,18 @@ echo ""
 
 # Test T2: security-review/README.md <= 40 lines
 echo "[T2] Testing security-review/README.md line count..."
-LINE_COUNT=$(wc -l < skills/security-review/README.md)
-if [[ ${LINE_COUNT} -le 40 ]]; then
-    echo "✓ PASS: README.md has ${LINE_COUNT} lines (<= 40)"
-    PASSED_TESTS=$((PASSED_TESTS + 1))
-else
-    echo "✗ FAIL: README.md has ${LINE_COUNT} lines (> 40)"
+if [[ ! -f "skills/security-review/README.md" ]]; then
+    echo "✗ FAIL: README.md does not exist"
     FAILED_TESTS=$((FAILED_TESTS + 1))
+else
+    LINE_COUNT=$(wc -l < skills/security-review/README.md)
+    if [[ ${LINE_COUNT} -le 40 ]]; then
+        echo "✓ PASS: README.md has ${LINE_COUNT} lines (<= 40)"
+        PASSED_TESTS=$((PASSED_TESTS + 1))
+    else
+        echo "✗ FAIL: README.md has ${LINE_COUNT} lines (> 40)"
+        FAILED_TESTS=$((FAILED_TESTS + 1))
+    fi
 fi
 
 # Check that duplicated tables are removed
