@@ -1,0 +1,152 @@
+server:
+  port: 18081
+
+issue_tracker:
+  type: linear
+  api_key: $LINEAR_API_KEY
+  team_id: $LINEAR_TEAM_ID
+  project: "agent-skills"
+  candidate_states:
+    - Todo
+    - "In Progress"
+    - "Ready for Review"
+  terminal_states:
+    - Done
+    - Canceled
+  state_labels:
+    enabled: true
+    claimed: "nyaphony:claimed"
+    running: "nyaphony:running"
+    retry: "nyaphony:retry"
+    failed: "nyaphony:failed"
+
+notifications:
+  slack:
+    enabled: false
+    webhook_url: $NYAPHONY_SLACK_WEBHOOK_URL
+
+logging:
+  level: debug
+  file_path: ./nyaphony.log
+  use_stdout: true
+
+coding_agent:
+  type: claude
+  model: sonnet
+  command: claude
+  permission_mode: dangerously-skip-permissions
+  max_turns: 100
+  stall_timeout: 300
+  log_level: debug
+
+orchestrator:
+  poll_interval: 30
+  max_concurrent: 3
+  max_retries: 5
+  # dispatch_order: ticket_priority
+  workflows:
+    - name: planning
+      priority: -10
+      enabled: true
+      filter:
+        states:
+          - Todo
+        exclude_labels:
+          - "No Automation"
+          - Blocked
+          - Planned
+      command: "/ticket:plan {{.Issue.Identifier}}"
+      use_workspace: false
+      on_success:
+        add_label: Planned
+        require_comment: "## Implementation Plan"
+
+    - name: development
+      priority: 0
+      enabled: true
+      filter:
+        states:
+          - Todo
+          - "In Progress"
+        require_labels:
+          - Planned
+        exclude_labels:
+          - "No Automation"
+          - Blocked
+          - "PR Created"
+      command: "/ticket:develop {{.Issue.Identifier}}"
+      use_workspace: false
+      use_worktree: true
+      on_start:
+        transition_state: "In Progress"
+      on_success:
+        add_label_if_pr: "PR Created"
+
+    - name: bot-review-fix
+      priority: 10
+      enabled: true
+      filter:
+        states:
+          - "In Progress"
+        require_labels:
+          - "PR Created"
+        exclude_labels:
+          - "No Automation"
+          - "Bot Review Fixed"
+          - Blocked
+      command: "/ticket:develop-bot-review-fix {{.Issue.Identifier}}"
+      use_workspace: false
+      use_worktree: true
+      bot_review:
+        reviewers:
+          - copilot
+        poll_interval: 60
+        max_wait: 600
+      on_success:
+        transition_state: "Ready for Review"
+        add_label: "Bot Review Fixed"
+
+    - name: conflict-resolution
+      priority: 15
+      enabled: true
+      filter:
+        states:
+          - "Ready for Review"
+        exclude_labels:
+          - "No Automation"
+          - Blocked
+          - "Conflicts Resolved"
+        require_conflicts: true
+      command: "/integration:pr-conflict {{.Issue.PRURL}}"
+      use_workspace: false
+      on_start:
+        add_label: "Conflict Resolution In Progress"
+      on_success:
+        add_label: "Conflicts Resolved"
+
+    - name: requirements-verification
+      priority: 20
+      enabled: false
+      filter:
+        states:
+          - "In Progress"
+        require_labels:
+          - bot-review-fixed
+        exclude_labels:
+          - "No Automation"
+          - blocked
+          - requirements-verified
+        assignees:
+          - $ASSIGNEE_EMAIL
+      command: "/ticket:verify {{.Issue.Identifier}}"
+      use_workspace: false
+      use_worktree: true
+      on_success:
+        transition_state: "Ready for Review"
+        add_label: requirements-verified
+
+workspace:
+  root: ~/workspaces/agent-skills
+  after_create: |
+    git clone $REPO_URL . 2>/dev/null || true
+    git checkout -b $BRANCH_NAME 2>/dev/null || true
