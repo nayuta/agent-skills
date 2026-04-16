@@ -8,6 +8,7 @@ This file provides guidance to AI coding agents (Claude Code, Cursor, Copilot, e
 
 | Name             | Description                                                                                | Link                                                                                 |
 | :--------------- | :----------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------- |
+| audit-docs       | Validate CLAUDE.md and AGENTS.md against actual codebase structure and conventions.        | [.claude/skills/audit-docs/SKILL.md](.claude/skills/audit-docs/SKILL.md)             |
 | validate-fix     | Iteratively run Agent Skill validation and resolve any issues found.                       | [.claude/skills/validate-fix/SKILL.md](.claude/skills/validate-fix/SKILL.md)         |
 | mend-docs        | Maintain and synchronize documentation files with the actual codebase (agents and skills). | [.claude/skills/mend-docs/SKILL.md](.claude/skills/mend-docs/SKILL.md)               |
 | mend-agent-rules | Synchronize CLAUDE.md and AGENTS.md with available agents and skills.                      | [.claude/skills/mend-agent-rules/SKILL.md](.claude/skills/mend-agent-rules/SKILL.md) |

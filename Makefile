@@ -1,4 +1,4 @@
-.PHONY: setup lint format validate-skills
+.PHONY: setup lint format validate-skills audit-docs
 
 setup:
 	npx skills add ubie-inc/agent-skills --skill validate-fix --skill mend-docs --skill mend-agent-rules -y
@@ -13,3 +13,6 @@ format:
 
 validate-skills:
 	uv run bash dev/validate_skills.sh
+
+audit-docs:
+	uv run .claude/skills/audit-docs/scripts/audit_docs.py .
