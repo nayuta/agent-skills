@@ -158,6 +158,11 @@ def validate_table(table_text: str, file: str, line: int) -> list[Finding]:
 
     if len(separator_cols) != 3:
         findings.append(Finding("ERROR", "TABLE_MALFORMED", "Separator row must have 3 columns", file, line + 1))
+    else:
+        sep_pattern = re.compile(r"^:?-+:?$")
+        for col in separator_cols:
+            if not sep_pattern.match(col):
+                findings.append(Finding("ERROR", "TABLE_MALFORMED", f"Invalid separator syntax: '{col}' (expected pattern like :--- or ---)", file, line + 1))
 
     # Validate data rows have 3 columns
     for i, data_line in enumerate(lines[2:], start=2):
@@ -314,6 +319,12 @@ def validate_agents_sync(repo_path: Path) -> Report:
     # Extract body (everything after first line)
     claude_lines = claude_text.splitlines()
     agents_lines = agents_text.splitlines()
+
+    # Validate first-line headers
+    if claude_lines and claude_lines[0].strip() != "# CLAUDE.md":
+        findings.append(Finding("WARN", "HEADER_UNEXPECTED", f"Expected first line '# CLAUDE.md', found '{claude_lines[0].strip()}'", str(claude_path), 1))
+    if agents_lines and agents_lines[0].strip() != "# AGENTS.md":
+        findings.append(Finding("WARN", "HEADER_UNEXPECTED", f"Expected first line '# AGENTS.md', found '{agents_lines[0].strip()}'", str(agents_path), 1))
 
     claude_body = "\n".join(claude_lines[1:]) if len(claude_lines) > 1 else ""
     agents_body = "\n".join(agents_lines[1:]) if len(agents_lines) > 1 else ""

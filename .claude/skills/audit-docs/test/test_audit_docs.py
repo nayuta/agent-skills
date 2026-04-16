@@ -356,3 +356,54 @@ def test_exit_code_issues(tmp_path: Path) -> None:
 
     # Should return 1
     assert result.returncode == 1
+
+
+def test_unlisted_agent_fails(tmp_path: Path) -> None:
+    """Test that agents not listed in the table cause AGENT_UNLISTED error."""
+    # Create agent that's not listed in CLAUDE.md
+    agent_dir = tmp_path / ".claude/agents"
+    agent_dir.mkdir(parents=True)
+    (agent_dir / "orphan-agent.md").write_text(dedent("""\
+        ---
+        name: orphan-agent
+        description: This agent is not listed in the table
+        ---
+
+        # Orphan Agent
+
+        This should trigger AGENT_UNLISTED.
+        """))
+
+    # Create CLAUDE.md without this agent
+    (tmp_path / "CLAUDE.md").write_text(dedent("""\
+        # CLAUDE.md
+
+        ## Available Skills
+
+        <!-- AVAILABLE_SKILLS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_SKILLS_END -->
+
+        ## Available Agents
+
+        <!-- AVAILABLE_AGENTS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_AGENTS_END -->
+        """))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    # Should fail with AGENT_UNLISTED error
+    assert result.returncode == 1
+    assert "AGENT_UNLISTED" in result.stdout

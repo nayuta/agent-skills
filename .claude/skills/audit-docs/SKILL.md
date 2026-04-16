@@ -76,7 +76,7 @@ make audit-docs
 
 - `0` - All checks passed
 - `1` - Issues found (validation errors)
-- `2` - Fatal error (missing files, invalid arguments)
+- `2` - Fatal error (invalid arguments, invalid repository path)
 
 ## Output Format
 
@@ -95,7 +95,7 @@ Human-readable plain text listing all findings:
 - **Skill directory without SKILL.md**: Ignored (not validated)
 - **Skills with `unlisted: true`**: Excluded from completeness check
 - **No AGENTS.md**: Skips synchronization check
-- **Multi-line table cells**: Handled via pipe delimiter parsing
+- **Multi-line table cells**: Not supported; rows are validated line-by-line
 
 ## Implementation Details
 
@@ -112,7 +112,7 @@ Run test suite:
 uv run pytest .claude/skills/audit-docs/test/test_audit_docs.py -v
 ```
 
-9 test functions covering:
+10 test functions covering:
 
 1. Valid CLAUDE.md passes
 2. Missing markers fail
@@ -123,6 +123,7 @@ uv run pytest .claude/skills/audit-docs/test/test_audit_docs.py -v
 7. AGENTS.md desync fails
 8. Exit code 0 for clean
 9. Exit code 1 for issues
+10. Unlisted agents fail
 
 ## Integration
 
