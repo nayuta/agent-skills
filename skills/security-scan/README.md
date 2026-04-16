@@ -14,7 +14,7 @@ Runs all available security tools and reports findings with severity classificat
 | ---------- | ------------------------------------------------ | ----------------------- |
 | `gitleaks` | Secret detection in git history and working tree | `brew install gitleaks` |
 | `semgrep`  | Static analysis — OWASP and security rule packs  | `brew install semgrep`  |
-| `trivy`    | Vulnerability and misconfiguration scanning      | `brew install trivy`    |
+| `grype`    | Filesystem vulnerability scanning                | `brew install grype`    |
 
 ### Language-specific (auto-detected by project files)
 
@@ -55,7 +55,7 @@ Runs all available security tools and reports findings with severity classificat
 
 ### Install Missing Tools
 
-- trivy: `brew install trivy`
+- grype: `brew install grype`
 ```
 
 ## Bundled resources
