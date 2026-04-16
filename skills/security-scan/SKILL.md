@@ -3,7 +3,7 @@ name: security-scan
 description: |
   Runs available security scanning tools against the current project and produces
   a consolidated markdown report. Auto-detects installed tools (gitleaks, semgrep,
-  trivy, npm audit, bandit, pip-audit, gosec, govulncheck, cargo audit,
+  grype, npm audit, bandit, pip-audit, gosec, govulncheck, cargo audit,
   bundle-audit) and activates language-specific scanners based on project files.
   Gracefully skips missing tools and provides installation hints.
   By default scans the entire target directory. Pass --full to make the intent
@@ -13,7 +13,7 @@ description: |
   Pairs with security-review for a complete security workflow.
 allowed-tools: Bash
 compatibility: |
-  Requires bash. Optional external tools: gitleaks, semgrep, trivy, npm, bandit,
+  Requires bash. Optional external tools: gitleaks, semgrep, grype, npm, bandit,
   pip-audit, gosec, govulncheck, cargo-audit, bundler-audit. Missing tools are
   skipped gracefully.
 metadata:
@@ -126,7 +126,7 @@ Present findings in this structure:
 | ---------- | -------------------------------------------------- | ----------------------- |
 | `gitleaks` | Secret detection in git history and working tree   | `brew install gitleaks` |
 | `semgrep`  | Static analysis with OWASP and security rule packs | `brew install semgrep`  |
-| `trivy`    | Vulnerability and misconfiguration scanning        | `brew install trivy`    |
+| `grype`    | Filesystem vulnerability scanning                  | `brew install grype`    |
 
 ### Language-Specific (auto-detected)
 
@@ -151,8 +151,8 @@ gitleaks detect --no-banner -v
 # Static analysis
 semgrep scan --config=auto --quiet
 
-# Vulnerabilities / misconfigurations
-trivy fs --severity HIGH,CRITICAL .
+# Filesystem vulnerability scanning
+grype dir:.
 
 # Node.js
 npm audit --omit=dev

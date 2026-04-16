@@ -113,8 +113,8 @@ run_tool "gitleaks" gitleaks detect --no-banner --no-git -v
 # semgrep — static analysis with auto-configured OWASP rules
 run_tool "semgrep" semgrep scan --config=auto --quiet --no-git-ignore
 
-# trivy — vulnerability and misconfiguration scanning
-run_tool "trivy" trivy fs --severity HIGH,CRITICAL --quiet .
+# grype — filesystem vulnerability scanning
+run_tool "grype" grype dir:. -q
 
 # --- Language-Specific Scanners ---
 
@@ -159,13 +159,13 @@ if [[ ${#SKIPPED_TOOLS[@]} -gt 0 ]]; then
 	echo ""
 	echo "### Install missing tools"
 	echo ""
-	for tool in gitleaks semgrep trivy bandit pip-audit gosec govulncheck "cargo audit" bundle-audit; do
+	for tool in gitleaks semgrep grype bandit pip-audit gosec govulncheck "cargo audit" bundle-audit; do
 		if is_skipped "${tool}"; then
 			# shellcheck disable=SC2016
 			case "${tool}" in
 			gitleaks) echo '- `gitleaks`: `brew install gitleaks`' ;;
 			semgrep) echo '- `semgrep`: `brew install semgrep` or `pip install semgrep`' ;;
-			trivy) echo '- `trivy`: `brew install trivy`' ;;
+			grype) echo '- `grype`: `brew install grype`' ;;
 			bandit) echo '- `bandit`: `pip install bandit`' ;;
 			pip-audit) echo '- `pip-audit`: `pip install pip-audit`' ;;
 			gosec) echo '- `gosec`: `go install github.com/securego/gosec/v2/cmd/gosec@latest`' ;;
