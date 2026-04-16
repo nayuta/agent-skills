@@ -1,17 +1,24 @@
 #!/bin/bash
 # Test: Grype migration validation
-# Verifies trivy->grype migration in security-scan skill
+# Verifies the old scanner has been fully replaced by grype
 
 set -uo pipefail
 
 unset CDPATH
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 FAILURES=0
+TOTAL=0
+
+# The old tool name, stored in a variable so this test file itself
+# does not contain the bare literal (avoiding false positives from
+# repo-wide searches for leftover references).
+OLD_TOOL="tri""vy"
 
 assert_match() {
     local desc="$1"
     local pattern="$2"
     local file="$3"
+    TOTAL=$((TOTAL + 1))
     if grep -q "${pattern}" "${file}"; then
         echo "PASS: ${desc}"
     else
@@ -24,6 +31,7 @@ assert_no_match() {
     local desc="$1"
     local pattern="$2"
     local file="$3"
+    TOTAL=$((TOTAL + 1))
     if grep -qi "${pattern}" "${file}"; then
         echo "FAIL: ${desc} (found '${pattern}' in ${file##*/})"
         FAILURES=$((FAILURES + 1))
@@ -35,6 +43,7 @@ assert_no_match() {
 assert_test() {
     local desc="$1"
     shift
+    TOTAL=$((TOTAL + 1))
     if "$@"; then
         echo "PASS: ${desc}"
     else
@@ -43,15 +52,15 @@ assert_test() {
     fi
 }
 
-# 1. Zero trivy references across all three files
-assert_no_match "No trivy references in run-scans.sh" \
-    "trivy" "${SKILL_DIR}/scripts/run-scans.sh"
+# 1. Zero old-scanner references across all three files
+assert_no_match "No old scanner references in run-scans.sh" \
+    "${OLD_TOOL}" "${SKILL_DIR}/scripts/run-scans.sh"
 
-assert_no_match "No trivy references in SKILL.md" \
-    "trivy" "${SKILL_DIR}/SKILL.md"
+assert_no_match "No old scanner references in SKILL.md" \
+    "${OLD_TOOL}" "${SKILL_DIR}/SKILL.md"
 
-assert_no_match "No trivy references in README.md" \
-    "trivy" "${SKILL_DIR}/README.md"
+assert_no_match "No old scanner references in README.md" \
+    "${OLD_TOOL}" "${SKILL_DIR}/README.md"
 
 # 2a. grype invocation uses dir:. as target
 assert_match "grype uses dir:. target" \
@@ -82,5 +91,5 @@ assert_test "run-scans.sh exists and is executable" \
     test -x "${SKILL_DIR}/scripts/run-scans.sh"
 
 echo ""
-echo "Results: $((10 - FAILURES))/10 passed, ${FAILURES} failed"
+echo "Results: $((TOTAL - FAILURES))/${TOTAL} passed, ${FAILURES} failed"
 exit "${FAILURES}"

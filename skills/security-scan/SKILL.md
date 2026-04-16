@@ -14,7 +14,7 @@ description: |
 allowed-tools: Bash
 compatibility: |
   Requires bash. Optional external tools: gitleaks, semgrep, grype, npm, bandit,
-  pip-audit, gosec, govulncheck, cargo-audit, bundler-audit. Missing tools are
+  pip-audit, gosec, govulncheck, cargo audit, bundle-audit. Missing tools are
   skipped gracefully.
 metadata:
   version: "1.1.0"
