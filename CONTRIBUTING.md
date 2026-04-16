@@ -69,11 +69,11 @@ The following skills are installed via `make setup` from `ubie-inc/agent-skills`
 
 <!-- PROJECT_SKILLS_START -->
 
-| Name              | Description                                                                        | Source                    |
-| :---------------- | :--------------------------------------------------------------------------------- | :------------------------ |
-| validate-fix      | Iteratively run Agent Skill validation and resolve any issues found.               | `ubie-inc/agent-skills`   |
-| mend-docs         | Maintain and synchronize documentation files with the actual codebase.             | `ubie-inc/agent-skills`   |
-| mend-agent-rules  | Synchronize CLAUDE.md and AGENTS.md with available agents and skills.              | `ubie-inc/agent-skills`   |
+| Name             | Description                                                            | Source                  |
+| :--------------- | :--------------------------------------------------------------------- | :---------------------- |
+| validate-fix     | Iteratively run Agent Skill validation and resolve any issues found.   | `ubie-inc/agent-skills` |
+| mend-docs        | Maintain and synchronize documentation files with the actual codebase. | `ubie-inc/agent-skills` |
+| mend-agent-rules | Synchronize CLAUDE.md and AGENTS.md with available agents and skills.  | `ubie-inc/agent-skills` |
 
 <!-- PROJECT_SKILLS_END -->
 
@@ -81,8 +81,8 @@ The following skills are installed via `make setup` from `ubie-inc/agent-skills`
 
 <!-- PROJECT_AGENTS_START -->
 
-| Name              | Description                                                                                                                  | Link                                                                         |
-| :---------------- | :--------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------- |
-| maintainer-agent  | Expert codebase maintainer. Synchronizes documentation and ensures all Agent Skills are valid. | [.claude/agents/maintainer-agent.md](.claude/agents/maintainer-agent.md) |
+| Name             | Description                                                                                    | Link                                                                     |
+| :--------------- | :--------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------- |
+| maintainer-agent | Expert codebase maintainer. Synchronizes documentation and ensures all Agent Skills are valid. | [.claude/agents/maintainer-agent.md](.claude/agents/maintainer-agent.md) |
 
 <!-- PROJECT_AGENTS_END -->

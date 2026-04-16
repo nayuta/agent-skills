@@ -31,14 +31,19 @@ detected project files. Missing tools are skipped with installation guidance.
 
 ## Scan Modes
 
-| Mode | Flag | Behavior |
-| ---- | ---- | -------- |
-| Full scan (default) | _(none)_ | Scans the entire target directory |
-| Full scan (explicit) | `--full` | Same as default; use to make intent explicit in scripts or CI |
+| Mode                 | Flag       | Behavior                                                          |
+| -------------------- | ---------- | ----------------------------------------------------------------- |
+| Full scan (default)  | _(none)_   | Scans the entire target directory                                 |
+| Full scan (explicit) | `--full`   | Same as default; use to make intent explicit in scripts or CI     |
+| Strict mode          | `--strict` | Exit with non-zero code when findings are detected (for CI gates) |
 
 Both modes scan the full directory tree. Pass `--full` when calling from a workflow
 that combines this skill with diff-scoped reviews (e.g., `security-review`) so the
 output header clearly identifies the scan scope.
+
+Use `--strict` in CI pipelines or pre-commit hooks to fail the build when security
+findings are detected. Without `--strict`, the script always exits 0 after completing
+the scan (findings are reported in markdown output, but don't fail the pipeline).
 
 ## Workflow
 
@@ -52,12 +57,15 @@ bash skills/security-scan/scripts/run-scans.sh [target-directory]
 
 # Explicit full scan (identical result, intent is documented in output)
 bash skills/security-scan/scripts/run-scans.sh --full [target-directory]
+
+# Strict mode: exit non-zero if findings detected (for CI gates)
+bash skills/security-scan/scripts/run-scans.sh --strict [target-directory]
 ```
 
 If the skills directory is elsewhere, use the absolute path:
 
 ```bash
-bash ~/.claude/skills/security-scan/scripts/run-scans.sh [--full] [target-directory]
+bash ~/.claude/skills/security-scan/scripts/run-scans.sh [--full] [--strict] [target-directory]
 ```
 
 If the script is unavailable, run tools manually per the [Manual Scan](#manual-scan) section.
@@ -176,7 +184,8 @@ bundle-audit check --update
 
 - **security-review** — use after this scan to perform AI-driven code analysis; pass
   `--full` to that skill to review the entire codebase alongside this full scan
-- **CI pipeline** — run as a pre-merge gate; completed scans exit 0 (findings are reported in output), but invalid arguments or other usage errors may exit non-zero
+- **CI pipeline** — run as a pre-merge gate using `--strict` to fail when findings are
+  detected; without `--strict`, scans exit 0 (findings are reported in output only)
 
 ## Bundled Resources
 

@@ -6,11 +6,11 @@ This file provides guidance to AI coding agents (Claude Code, Cursor, Copilot, e
 
 <!-- AVAILABLE_SKILLS_START -->
 
-| Name             | Description                                                                                    | Link                                                                                                   |
-| :--------------- | :--------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------- |
-| validate-fix     | Iteratively run Agent Skill validation and resolve any issues found.                           | [.claude/skills/validate-fix/SKILL.md](.claude/skills/validate-fix/SKILL.md)                           |
-| mend-docs        | Maintain and synchronize documentation files with the actual codebase (agents and skills).     | [.claude/skills/mend-docs/SKILL.md](.claude/skills/mend-docs/SKILL.md)                                 |
-| mend-agent-rules | Synchronize CLAUDE.md and AGENTS.md with available agents and skills.                          | [.claude/skills/mend-agent-rules/SKILL.md](.claude/skills/mend-agent-rules/SKILL.md)                   |
+| Name             | Description                                                                                | Link                                                                                 |
+| :--------------- | :----------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------- |
+| validate-fix     | Iteratively run Agent Skill validation and resolve any issues found.                       | [.claude/skills/validate-fix/SKILL.md](.claude/skills/validate-fix/SKILL.md)         |
+| mend-docs        | Maintain and synchronize documentation files with the actual codebase (agents and skills). | [.claude/skills/mend-docs/SKILL.md](.claude/skills/mend-docs/SKILL.md)               |
+| mend-agent-rules | Synchronize CLAUDE.md and AGENTS.md with available agents and skills.                      | [.claude/skills/mend-agent-rules/SKILL.md](.claude/skills/mend-agent-rules/SKILL.md) |
 
 <!-- AVAILABLE_SKILLS_END -->
 
@@ -18,8 +18,8 @@ This file provides guidance to AI coding agents (Claude Code, Cursor, Copilot, e
 
 <!-- AVAILABLE_AGENTS_START -->
 
-| Name             | Description                                                                                                                                                                          | Link                                                                     |
-| :--------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------- |
+| Name             | Description                                                                                                                 | Link                                                                     |
+| :--------------- | :-------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------- |
 | maintainer-agent | Expert codebase maintainer. Proactively synchronizes documentation with the actual codebase and validates all Agent Skills. | [.claude/agents/maintainer-agent.md](.claude/agents/maintainer-agent.md) |
 
 <!-- AVAILABLE_AGENTS_END -->
