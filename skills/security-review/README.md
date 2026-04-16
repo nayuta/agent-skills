@@ -20,58 +20,12 @@ Language-agnostic — works on any codebase. No tools to install.
 /security-review
 ```
 
-## Vulnerability categories
-
-| #   | Category                             | Examples                                                    |
-| --- | ------------------------------------ | ----------------------------------------------------------- |
-| 1   | Secrets and Credentials              | Hardcoded API keys, embedded passwords                      |
-| 2   | Injection                            | SQL, command, template, NoSQL injection                     |
-| 3   | Authentication and Authorization     | IDOR, broken JWT, missing auth guards, privilege escalation |
-| 4   | Cryptography                         | Weak algorithms, insecure RNG, static IVs                   |
-| 5   | Input Validation and Output Encoding | XSS, SSRF, path traversal, open redirect                    |
-| 6   | Sensitive Data Exposure              | PII in logs, secrets in API responses, verbose errors       |
-| 7   | Dependency Risks                     | New packages with CVEs, integrity check bypasses            |
-| 8   | Security Configuration               | Missing rate limits, CORS wildcard, TLS skip                |
-
-## Confidence threshold
-
-Only findings with confidence ≥ 8/10 are reported:
-
-| Score | Meaning                                             |
-| ----- | --------------------------------------------------- |
-| 10    | Exploitable with certainty, clear reproduction path |
-| 9     | Very likely exploitable, minor assumption required  |
-| 8     | Likely exploitable, context supports it             |
-| ≤ 7   | Excluded — possible false positive or low impact    |
-
-## Output format
-
-```markdown
-## Security Review
-
-**Date**: 2026-04-08T00:00:00Z
-**Branch**: feat/my-feature
-**Files reviewed**: 12
-**High-confidence findings**: 2 (Critical: 1 | High: 1 | Medium: 0)
-
----
-
-## Critical
-
-### [SEC-001] SQL Injection in UserRepository
-
-**File**: `src/users/repository.ts:42`
-**Category**: Injection > SQL Injection
-**Confidence**: 9/10
-
-**Evidence**: ...
-**Impact**: ...
-**Remediation**: ...
-```
+By default, reviews only changed files in the current branch. Pass `--full` to review the entire codebase instead of just the diff.
 
 ## References
 
-- [Vulnerability Categories Detail](references/vulnerability-categories.md) — deeper patterns and examples per category
+- [Vulnerability Categories Detail](references/vulnerability-categories.md) — detailed patterns and examples for all 8 vulnerability categories
+- See SKILL.md for complete workflow instructions and confidence scoring
 
 ## Pairs with
 

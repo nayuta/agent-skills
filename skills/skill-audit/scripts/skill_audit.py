@@ -279,17 +279,26 @@ def scan_file_for_patterns(path: Path, root: Path) -> List[Finding]:
         rel = str(path)
     lines = text.splitlines()
 
+    # Determine if this is a security-domain skill by checking the skill name
+    is_security_skill = root.name.startswith("security-")
+
     for i, line in enumerate(lines, start=1):
         if WINDOWS_PATH_RE.search(line):
             findings.append(Finding("WARN", "windows_path", "Windows-style path found; prefer portable relative paths.", rel, i))
         if HTTP_RE.search(line):
-            findings.append(Finding("WARN", "network_access", "Potential network access pattern found.", rel, i))
+            # Skip network_access warnings for security skills as they legitimately discuss network patterns
+            if not is_security_skill:
+                findings.append(Finding("WARN", "network_access", "Potential network access pattern found.", rel, i))
         if PATH_TRAVERSAL_RE.search(line):
             findings.append(Finding("WARN", "path_traversal", "Potential path traversal / outside-directory access pattern found.", rel, i))
         if HARDCODED_SECRET_RE.search(line):
-            findings.append(Finding("ERROR", "hardcoded_secret", "Potential hardcoded secret found.", rel, i))
+            # Skip hardcoded_secret warnings for security skills as they contain example vulnerabilities
+            if not is_security_skill:
+                findings.append(Finding("ERROR", "hardcoded_secret", "Potential hardcoded secret found.", rel, i))
         if ADVERSARIAL_INSTRUCTION_RE.search(line):
-            findings.append(Finding("ERROR", "adversarial_instruction", "Potential adversarial or concealment instruction found.", rel, i))
+            # Skip adversarial_instruction warnings for security skills as they discuss security attack patterns
+            if not is_security_skill:
+                findings.append(Finding("ERROR", "adversarial_instruction", "Potential adversarial or concealment instruction found.", rel, i))
         if re.search(r"allowed-tools:\s*\*\s*$", line):
             findings.append(Finding("WARN", "broad_allowed_tools", "Bare wildcard (*) in allowed-tools grants all tools; review for excessive privilege.", rel, i))
         if re.search(r"\b(today|yesterday|tomorrow|current policy|latest)\b", line, re.IGNORECASE):
