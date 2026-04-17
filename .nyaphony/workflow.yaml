@@ -103,7 +103,7 @@ orchestrator:
         poll_interval: 60
         max_wait: 600
         max_fix_iterations: 3
-        fallback_command: "/ticket:develop-review-fix {{.Issue.Identifier}}"
+        fallback_command: "/ticket:develop-review-fix {{.Issue.Identifier}} --max-iterations 3"
       on_success:
         transition_state: "Ready for Review"
         add_label: "Bot Review Fixed"
