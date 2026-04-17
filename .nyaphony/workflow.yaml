@@ -40,7 +40,7 @@ coding_agent:
   log_level: debug
 
 orchestrator:
-  poll_interval: 30
+  poll_interval: 60
   max_concurrent: 3
   max_retries: 5
   # dispatch_order: ticket_priority
