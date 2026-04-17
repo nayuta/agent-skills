@@ -1,5 +1,5 @@
 server:
-  port: 18081
+  port: 18084
 
 issue_tracker:
   type: linear
@@ -102,13 +102,15 @@ orchestrator:
           - copilot
         poll_interval: 60
         max_wait: 600
+        max_fix_iterations: 3
+        fallback_command: "/ticket:develop-review-fix {{.Issue.Identifier}}"
       on_success:
         transition_state: "Ready for Review"
         add_label: "Bot Review Fixed"
 
     - name: conflict-resolution
       priority: 15
-      enabled: true
+      enabled: false
       filter:
         states:
           - "Ready for Review"
