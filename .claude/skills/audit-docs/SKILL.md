@@ -35,9 +35,10 @@ All file links in tables must:
 
 ### 4. Skill Completeness (SKILL_UNLISTED)
 
-All skills in `.claude/skills/` must:
+All skills in `.claude/skills/` and `skills/` must:
 
 - Be listed in the Available Skills table
+- Both directories are scanned: `.claude/skills/` (project skills) and `skills/` (distributed skills installed via `npx skills add`)
 - Exception: Skills with `unlisted: true` in frontmatter are ignored
 
 ### 5. Agent Completeness (AGENT_UNLISTED)
@@ -180,7 +181,7 @@ Run test suite:
 uv run pytest .claude/skills/audit-docs/test/test_audit_docs.py -v
 ```
 
-31 test functions covering:
+36 test functions covering:
 
 1. Valid CLAUDE.md passes
 2. Missing markers fail
@@ -192,27 +193,32 @@ uv run pytest .claude/skills/audit-docs/test/test_audit_docs.py -v
 8. Exit code 0 for clean
 9. Exit code 1 for issues
 10. Unlisted agents fail
-11. FILE_TOO_LONG warns on 201+ lines
-12. File under 200 lines passes
-13. IMPORT_BROKEN on nonexistent @path
-14. Valid @import passes
-15. @path in code block ignored
-16. @path in code block with backticks ignored
-17. IMPORT_SENSITIVE on .env/@secrets.key
-18. Non-sensitive import passes
-19. DESCRIPTION_MISMATCH warns
-20. Matching description passes
-21. NAME_MISMATCH on differing names
-22. Matching name passes
-23. AGENTS_NO_IMPORT warns when bodies differ
-24. @AGENTS.md import present passes
-25. Synced bodies produce no warning
-26. Invalid glob pattern warns
-27. Valid glob pattern passes
-28. Broken link in rules fails
-29. Valid link in rules passes
-30. Email not treated as import
-31. No rules directory passes
+11. Root skills/ unlisted triggers SKILL_UNLISTED
+12. Root skills/ with unlisted: true ignored
+13. Skills in both directories pass when all listed
+14. FILE_TOO_LONG warns on 201+ lines
+15. File under 200 lines passes
+16. IMPORT_BROKEN on nonexistent @path
+17. Valid @import passes
+18. @path in code block ignored
+19. @path in code block with backticks ignored
+20. IMPORT_SENSITIVE on .env/@secrets.key
+21. Non-sensitive import passes
+22. DESCRIPTION_MISMATCH warns
+23. Matching description passes
+24. NAME_MISMATCH on differing names
+25. Matching name passes
+26. AGENTS_NO_IMPORT warns when bodies differ
+27. @AGENTS.md import present passes
+28. Synced bodies produce no warning
+29. Invalid glob pattern warns
+30. Valid glob pattern passes
+31. Broken link in rules fails
+32. Valid link in rules passes
+33. Email not treated as import
+34. No rules directory passes
+35. @path in inline code ignored
+36. IMPORT_SENSITIVE on sensitive directories
 
 ## Integration
 

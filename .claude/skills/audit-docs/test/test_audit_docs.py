@@ -383,6 +383,184 @@ def test_exit_code_issues(tmp_path: Path) -> None:
     assert result.returncode == 1
 
 
+def test_root_skills_unlisted_fails(tmp_path: Path) -> None:
+    """Test that skills in root skills/ directory trigger SKILL_UNLISTED when not listed."""
+    # Create skill in root skills/ directory (not .claude/skills/)
+    skill_dir = tmp_path / "skills/root-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(dedent("""\
+        ---
+        name: root-skill
+        description: A skill installed via npx skills add
+        ---
+
+        # Root Skill
+
+        This should trigger SKILL_UNLISTED because it is not in the table.
+        """))
+
+    # Create CLAUDE.md without this skill
+    (tmp_path / "CLAUDE.md").write_text(dedent("""\
+        # CLAUDE.md
+
+        ## Available Skills
+
+        <!-- AVAILABLE_SKILLS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_SKILLS_END -->
+
+        ## Available Agents
+
+        <!-- AVAILABLE_AGENTS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_AGENTS_END -->
+        """))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    # Should fail with SKILL_UNLISTED error
+    assert result.returncode == 1
+    assert "SKILL_UNLISTED" in result.stdout
+    assert "root-skill" in result.stdout
+
+
+def test_root_skills_unlisted_frontmatter_ignored(tmp_path: Path) -> None:
+    """Test that root skills/ skills with unlisted: true are ignored."""
+    # Create skill in root skills/ with unlisted: true
+    skill_dir = tmp_path / "skills/hidden-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(dedent("""\
+        ---
+        name: hidden-skill
+        description: A hidden distributed skill
+        unlisted: true
+        ---
+
+        # Hidden Skill
+
+        This should NOT trigger SKILL_UNLISTED.
+        """))
+
+    # Create CLAUDE.md without this skill
+    (tmp_path / "CLAUDE.md").write_text(dedent("""\
+        # CLAUDE.md
+
+        ## Available Skills
+
+        <!-- AVAILABLE_SKILLS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_SKILLS_END -->
+
+        ## Available Agents
+
+        <!-- AVAILABLE_AGENTS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_AGENTS_END -->
+        """))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    # Should pass because unlisted skills are ignored
+    assert result.returncode == 0
+
+
+def test_both_skill_dirs_valid_passes(tmp_path: Path) -> None:
+    """Test that skills in both .claude/skills/ and skills/ pass when all listed."""
+    # Create skill in .claude/skills/
+    claude_skill_dir = tmp_path / ".claude/skills/claude-skill"
+    claude_skill_dir.mkdir(parents=True)
+    (claude_skill_dir / "SKILL.md").write_text(dedent("""\
+        ---
+        name: claude-skill
+        description: A skill in .claude/skills
+        ---
+
+        # Claude Skill
+        """))
+
+    # Create skill in root skills/
+    root_skill_dir = tmp_path / "skills/root-skill"
+    root_skill_dir.mkdir(parents=True)
+    (root_skill_dir / "SKILL.md").write_text(dedent("""\
+        ---
+        name: root-skill
+        description: A skill in root skills/
+        ---
+
+        # Root Skill
+        """))
+
+    # Create valid agent
+    agent_file = tmp_path / ".claude/agents/test-agent.md"
+    agent_file.parent.mkdir(parents=True, exist_ok=True)
+    agent_file.write_text(dedent("""\
+        ---
+        name: test-agent
+        description: A test agent
+        ---
+
+        # Test Agent
+        """))
+
+    # Create CLAUDE.md listing both skills and the agent
+    (tmp_path / "CLAUDE.md").write_text(dedent("""\
+        # CLAUDE.md
+
+        ## Available Skills
+
+        <!-- AVAILABLE_SKILLS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+        | claude-skill | A skill in .claude/skills | [.claude/skills/claude-skill/SKILL.md](.claude/skills/claude-skill/SKILL.md) |
+        | root-skill | A skill in root skills/ | [skills/root-skill/SKILL.md](skills/root-skill/SKILL.md) |
+
+        <!-- AVAILABLE_SKILLS_END -->
+
+        ## Available Agents
+
+        <!-- AVAILABLE_AGENTS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+        | test-agent | A test agent | [.claude/agents/test-agent.md](.claude/agents/test-agent.md) |
+
+        <!-- AVAILABLE_AGENTS_END -->
+        """))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    # Should pass with exit code 0
+    assert result.returncode == 0, f"Expected exit code 0, got {result.returncode}. Output: {result.stdout}\nError: {result.stderr}"
+
+
 def test_unlisted_agent_fails(tmp_path: Path) -> None:
     """Test that agents not listed in the table cause AGENT_UNLISTED error."""
     # Create agent that's not listed in CLAUDE.md
