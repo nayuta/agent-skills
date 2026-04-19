@@ -3,7 +3,7 @@
 test_audit_docs.py
 
 Test suite for audit_docs.py script.
-Tests the 6 categories of static checks plus exit code behavior.
+Tests the 14 categories of static checks plus exit code behavior.
 """
 from __future__ import annotations
 
@@ -11,6 +11,31 @@ import subprocess
 import sys
 from pathlib import Path
 from textwrap import dedent
+
+
+def _minimal_claude_md() -> str:
+    """Return a minimal valid CLAUDE.md with empty tables."""
+    return dedent("""\
+        # CLAUDE.md
+
+        ## Available Skills
+
+        <!-- AVAILABLE_SKILLS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_SKILLS_END -->
+
+        ## Available Agents
+
+        <!-- AVAILABLE_AGENTS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_AGENTS_END -->
+        """)
 
 
 def test_valid_claude_passes(tmp_path: Path) -> None:
@@ -407,3 +432,631 @@ def test_unlisted_agent_fails(tmp_path: Path) -> None:
     # Should fail with AGENT_UNLISTED error
     assert result.returncode == 1
     assert "AGENT_UNLISTED" in result.stdout
+
+
+# =============================================================================
+# FILE_TOO_LONG tests
+# =============================================================================
+
+
+def test_file_too_long_warns(tmp_path: Path) -> None:
+    """Test that CLAUDE.md with 201+ lines triggers FILE_TOO_LONG warning."""
+    lines = ["# CLAUDE.md\n"] + [f"Line {i}\n" for i in range(200)]
+    # Add markers so we don't get MARKER_MISSING errors
+    lines.append("<!-- AVAILABLE_SKILLS_START -->\n")
+    lines.append("| Name | Description | Link |\n")
+    lines.append("| :--- | :---------- | :--- |\n")
+    lines.append("<!-- AVAILABLE_SKILLS_END -->\n")
+    lines.append("<!-- AVAILABLE_AGENTS_START -->\n")
+    lines.append("| Name | Description | Link |\n")
+    lines.append("| :--- | :---------- | :--- |\n")
+    lines.append("<!-- AVAILABLE_AGENTS_END -->\n")
+    (tmp_path / "CLAUDE.md").write_text("".join(lines))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "FILE_TOO_LONG" in result.stdout
+
+
+def test_file_under_limit_passes(tmp_path: Path) -> None:
+    """Test that CLAUDE.md with exactly 200 lines does not trigger FILE_TOO_LONG."""
+    # Build a CLAUDE.md that is exactly 200 lines with valid markers
+    header = dedent("""\
+        # CLAUDE.md
+
+        <!-- AVAILABLE_SKILLS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_SKILLS_END -->
+
+        <!-- AVAILABLE_AGENTS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_AGENTS_END -->
+        """)
+    header_lines = header.splitlines(keepends=True)
+    # Pad to exactly 200 lines
+    padding_count = 200 - len(header_lines)
+    padding = [f"Line {i}\n" for i in range(padding_count)]
+    (tmp_path / "CLAUDE.md").write_text("".join(header_lines + padding))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "FILE_TOO_LONG" not in result.stdout
+
+
+# =============================================================================
+# IMPORT_BROKEN tests
+# =============================================================================
+
+
+def test_import_broken_fails(tmp_path: Path) -> None:
+    """Test that @nonexistent/path in CLAUDE.md triggers IMPORT_BROKEN error."""
+    claude_text = _minimal_claude_md() + "\nSee @nonexistent/path.md for details.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "IMPORT_BROKEN" in result.stdout
+
+
+def test_import_valid_passes(tmp_path: Path) -> None:
+    """Test that @existing/path in CLAUDE.md passes when file exists."""
+    (tmp_path / "existing").mkdir()
+    (tmp_path / "existing/file.md").write_text("# Existing file\n")
+    claude_text = _minimal_claude_md() + "\nSee @existing/file.md for details.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "IMPORT_BROKEN" not in result.stdout
+
+
+def test_import_in_code_block_ignored(tmp_path: Path) -> None:
+    """Test that @path inside a fenced code block is NOT flagged."""
+    claude_text = _minimal_claude_md() + dedent("""\
+
+        ```
+        @nonexistent/path.md
+        ```
+        """)
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "IMPORT_BROKEN" not in result.stdout
+
+
+def test_import_in_code_block_with_backticks_ignored(tmp_path: Path) -> None:
+    """Test that @path inside a code block containing backticks is NOT flagged."""
+    claude_text = _minimal_claude_md() + dedent("""\
+
+        ```yaml
+        # See @nonexistent/file.md for `details`
+        ```
+        """)
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "IMPORT_BROKEN" not in result.stdout
+
+
+# =============================================================================
+# IMPORT_SENSITIVE tests
+# =============================================================================
+
+
+def test_import_sensitive_warns(tmp_path: Path) -> None:
+    """Test that @.env or @secrets.key triggers IMPORT_SENSITIVE warning."""
+    (tmp_path / ".env").write_text("SECRET=value\n")
+    claude_text = _minimal_claude_md() + "\nConfig at @.env\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "IMPORT_SENSITIVE" in result.stdout
+
+
+def test_import_non_sensitive_passes(tmp_path: Path) -> None:
+    """Test that @AGENTS.md (non-sensitive file) does not trigger IMPORT_SENSITIVE."""
+    (tmp_path / "AGENTS.md").write_text("# AGENTS.md\n")
+    claude_text = _minimal_claude_md() + "\nSee @AGENTS.md\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "IMPORT_SENSITIVE" not in result.stdout
+
+
+# =============================================================================
+# DESCRIPTION_MISMATCH tests
+# =============================================================================
+
+
+def test_description_mismatch_warns(tmp_path: Path) -> None:
+    """Test that table description differing from frontmatter triggers DESCRIPTION_MISMATCH."""
+    skill_dir = tmp_path / ".claude/skills/my-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(dedent("""\
+        ---
+        name: my-skill
+        description: The real description from frontmatter
+        ---
+
+        # My Skill
+        """))
+
+    (tmp_path / "CLAUDE.md").write_text(dedent("""\
+        # CLAUDE.md
+
+        <!-- AVAILABLE_SKILLS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+        | my-skill | Wrong description in table | [.claude/skills/my-skill/SKILL.md](.claude/skills/my-skill/SKILL.md) |
+
+        <!-- AVAILABLE_SKILLS_END -->
+
+        <!-- AVAILABLE_AGENTS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_AGENTS_END -->
+        """))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "DESCRIPTION_MISMATCH" in result.stdout
+
+
+def test_description_match_passes(tmp_path: Path) -> None:
+    """Test that matching table description and frontmatter passes."""
+    skill_dir = tmp_path / ".claude/skills/my-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(dedent("""\
+        ---
+        name: my-skill
+        description: Correct description
+        ---
+
+        # My Skill
+        """))
+
+    (tmp_path / "CLAUDE.md").write_text(dedent("""\
+        # CLAUDE.md
+
+        <!-- AVAILABLE_SKILLS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+        | my-skill | Correct description | [.claude/skills/my-skill/SKILL.md](.claude/skills/my-skill/SKILL.md) |
+
+        <!-- AVAILABLE_SKILLS_END -->
+
+        <!-- AVAILABLE_AGENTS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_AGENTS_END -->
+        """))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "DESCRIPTION_MISMATCH" not in result.stdout
+
+
+# =============================================================================
+# NAME_MISMATCH tests
+# =============================================================================
+
+
+def test_name_mismatch_fails(tmp_path: Path) -> None:
+    """Test that table name differing from frontmatter name triggers NAME_MISMATCH."""
+    skill_dir = tmp_path / ".claude/skills/my-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(dedent("""\
+        ---
+        name: actual-name
+        description: Some description
+        ---
+
+        # My Skill
+        """))
+
+    (tmp_path / "CLAUDE.md").write_text(dedent("""\
+        # CLAUDE.md
+
+        <!-- AVAILABLE_SKILLS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+        | wrong-name | Some description | [.claude/skills/my-skill/SKILL.md](.claude/skills/my-skill/SKILL.md) |
+
+        <!-- AVAILABLE_SKILLS_END -->
+
+        <!-- AVAILABLE_AGENTS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_AGENTS_END -->
+        """))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "NAME_MISMATCH" in result.stdout
+
+
+def test_name_match_passes(tmp_path: Path) -> None:
+    """Test that matching table name and frontmatter name passes."""
+    skill_dir = tmp_path / ".claude/skills/my-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(dedent("""\
+        ---
+        name: my-skill
+        description: Some description
+        ---
+
+        # My Skill
+        """))
+
+    (tmp_path / "CLAUDE.md").write_text(dedent("""\
+        # CLAUDE.md
+
+        <!-- AVAILABLE_SKILLS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+        | my-skill | Some description | [.claude/skills/my-skill/SKILL.md](.claude/skills/my-skill/SKILL.md) |
+
+        <!-- AVAILABLE_SKILLS_END -->
+
+        <!-- AVAILABLE_AGENTS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_AGENTS_END -->
+        """))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "NAME_MISMATCH" not in result.stdout
+
+
+# =============================================================================
+# AGENTS_NO_IMPORT tests
+# =============================================================================
+
+
+def test_agents_no_import_warns(tmp_path: Path) -> None:
+    """Test that AGENTS.md exists without @AGENTS.md import and bodies differ triggers warning."""
+    (tmp_path / "CLAUDE.md").write_text(_minimal_claude_md())
+    (tmp_path / "AGENTS.md").write_text(dedent("""\
+        # AGENTS.md
+
+        Different body content here.
+        """))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "AGENTS_NO_IMPORT" in result.stdout
+
+
+def test_agents_import_present_passes(tmp_path: Path) -> None:
+    """Test that CLAUDE.md with @AGENTS.md reference does not trigger AGENTS_NO_IMPORT."""
+    claude_text = _minimal_claude_md() + "\nImport: @AGENTS.md\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+    (tmp_path / "AGENTS.md").write_text(dedent("""\
+        # AGENTS.md
+
+        Different body content.
+        """))
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "AGENTS_NO_IMPORT" not in result.stdout
+
+
+def test_agents_synced_no_warn(tmp_path: Path) -> None:
+    """Test that synced bodies produce no AGENTS_NO_IMPORT even without @import."""
+    body = dedent("""\
+
+        ## Available Skills
+
+        <!-- AVAILABLE_SKILLS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_SKILLS_END -->
+
+        ## Available Agents
+
+        <!-- AVAILABLE_AGENTS_START -->
+
+        | Name | Description | Link |
+        | :--- | :---------- | :--- |
+
+        <!-- AVAILABLE_AGENTS_END -->
+        """)
+    (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md" + body)
+    (tmp_path / "AGENTS.md").write_text("# AGENTS.md" + body)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "AGENTS_NO_IMPORT" not in result.stdout
+
+
+# =============================================================================
+# RULES_INVALID_PATHS tests
+# =============================================================================
+
+
+def test_rules_invalid_glob_warns(tmp_path: Path) -> None:
+    """Test that a rule file with invalid glob pattern triggers RULES_INVALID_PATHS."""
+    rules_dir = tmp_path / ".claude/rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "test-rule.md").write_text(dedent("""\
+        ---
+        globs: "[unclosed-bracket"
+        ---
+
+        # Test Rule
+        """))
+
+    (tmp_path / "CLAUDE.md").write_text(_minimal_claude_md())
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "RULES_INVALID_PATHS" in result.stdout
+
+
+def test_rules_valid_glob_passes(tmp_path: Path) -> None:
+    """Test that a rule file with valid glob pattern passes."""
+    rules_dir = tmp_path / ".claude/rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "test-rule.md").write_text(dedent("""\
+        ---
+        globs: "*.py"
+        ---
+
+        # Test Rule
+        """))
+
+    (tmp_path / "CLAUDE.md").write_text(_minimal_claude_md())
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "RULES_INVALID_PATHS" not in result.stdout
+
+
+# =============================================================================
+# RULES_BROKEN_LINK tests
+# =============================================================================
+
+
+def test_rules_broken_link_fails(tmp_path: Path) -> None:
+    """Test that a rule file with broken markdown link triggers RULES_BROKEN_LINK."""
+    rules_dir = tmp_path / ".claude/rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "test-rule.md").write_text(dedent("""\
+        ---
+        globs: "*.py"
+        ---
+
+        # Test Rule
+
+        See [reference](docs/nonexistent.md) for details.
+        """))
+
+    (tmp_path / "CLAUDE.md").write_text(_minimal_claude_md())
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "RULES_BROKEN_LINK" in result.stdout
+
+
+def test_rules_valid_link_passes(tmp_path: Path) -> None:
+    """Test that a rule file with valid markdown link passes."""
+    rules_dir = tmp_path / ".claude/rules"
+    rules_dir.mkdir(parents=True)
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "guide.md").write_text("# Guide\n")
+    (rules_dir / "test-rule.md").write_text(dedent("""\
+        ---
+        globs: "*.py"
+        ---
+
+        # Test Rule
+
+        See [guide](docs/guide.md) for details.
+        """))
+
+    (tmp_path / "CLAUDE.md").write_text(_minimal_claude_md())
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "RULES_BROKEN_LINK" not in result.stdout
+
+
+# =============================================================================
+# Edge case tests
+# =============================================================================
+
+
+def test_email_not_treated_as_import(tmp_path: Path) -> None:
+    """Test that user@example.com in CLAUDE.md is NOT flagged as import."""
+    claude_text = _minimal_claude_md() + "\nContact: user@example.com\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "IMPORT_BROKEN" not in result.stdout
+    assert "IMPORT_SENSITIVE" not in result.stdout
+
+
+def test_no_rules_dir_passes(tmp_path: Path) -> None:
+    """Test that no .claude/rules/ directory produces no RULES findings."""
+    (tmp_path / "CLAUDE.md").write_text(_minimal_claude_md())
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "RULES_INVALID_PATHS" not in result.stdout
+    assert "RULES_BROKEN_LINK" not in result.stdout
+
+
+# =============================================================================
+# Inline code span tests (strip_code_blocks fix)
+# =============================================================================
+
+
+def test_import_in_inline_code_ignored(tmp_path: Path) -> None:
+    """Test that @path inside inline backticks is NOT flagged as IMPORT_BROKEN."""
+    claude_text = _minimal_claude_md() + "\nSee `@nonexistent/path.md` for details.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "IMPORT_BROKEN" not in result.stdout
+
+
+# =============================================================================
+# IMPORT_SENSITIVE directory path tests
+# =============================================================================
+
+
+def test_import_sensitive_directory_warns(tmp_path: Path) -> None:
+    """Test that @secrets/config.md triggers IMPORT_SENSITIVE when path contains sensitive dir."""
+    secrets_dir = tmp_path / "secrets"
+    secrets_dir.mkdir()
+    (secrets_dir / "config.md").write_text("# Config\n")
+    claude_text = _minimal_claude_md() + "\nSee @secrets/config.md for details.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "IMPORT_SENSITIVE" in result.stdout
