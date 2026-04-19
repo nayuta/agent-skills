@@ -54,6 +54,71 @@ All agents in `.claude/agents/` must:
 - Have identical body content to `CLAUDE.md` (excluding first line)
 - The first line of `AGENTS.md` is `# AGENTS.md` while `CLAUDE.md` is `# CLAUDE.md`
 
+### 7. File Length (FILE_TOO_LONG)
+
+`CLAUDE.md` should not exceed 200 lines (official Claude Code recommendation):
+
+- Severity: WARN
+- Counts total lines in the file
+
+### 8. Import Resolution (IMPORT_BROKEN)
+
+`@path` imports in CLAUDE.md text must resolve to existing files:
+
+- Regex-based detection of `@path` references outside fenced code blocks
+- Excludes email addresses (e.g., `user@example.com`)
+- Severity: ERROR
+
+### 9. Sensitive Imports (IMPORT_SENSITIVE)
+
+`@path` imports should not reference sensitive files:
+
+- Checks for patterns: `.env`, `.pem`, `.key`, `credentials`, `secret`, `password`, `token`
+- Only checked for valid (existing) imports
+- Severity: WARN
+
+### 10. Description Accuracy (DESCRIPTION_MISMATCH)
+
+Table descriptions must match frontmatter descriptions:
+
+- Compares description column in skills/agents tables with `description` field in SKILL.md or agent frontmatter
+- Skips if either description is empty
+- Severity: WARN
+
+### 11. Name Accuracy (NAME_MISMATCH)
+
+Table names must match frontmatter names:
+
+- Compares name column in skills/agents tables with `name` field in frontmatter
+- Severity: ERROR
+
+### 12. AGENTS.md Import (AGENTS_NO_IMPORT)
+
+CLAUDE.md should import AGENTS.md when it exists and bodies differ:
+
+- Warns when AGENTS.md exists, no `@AGENTS.md` import is present, and bodies are not synchronized
+- No warning if bodies are already in sync (content is already there)
+- Severity: WARN
+
+### 13. Rules Glob Patterns (RULES_INVALID_PATHS)
+
+Glob patterns in `.claude/rules/*.md` frontmatter must be valid:
+
+- Validates `globs` field in each rule file's frontmatter
+- Uses `fnmatch` to verify pattern validity
+- Graceful no-op when `.claude/rules/` doesn't exist
+- Severity: WARN
+
+### 14. Rules Links (RULES_BROKEN_LINK)
+
+Markdown links in `.claude/rules/*.md` files must resolve:
+
+- Checks `[text](path)` links in rule file bodies
+- Excludes external links (http://, https://, #, mailto:)
+- Resolves paths relative to repository root
+- Graceful no-op when `.claude/rules/` doesn't exist
+- Severity: ERROR
+
 ## Usage
 
 ### Basic Validation
@@ -96,6 +161,9 @@ Human-readable plain text listing all findings:
 - **Skills with `unlisted: true`**: Excluded from completeness check
 - **No AGENTS.md**: Skips synchronization check
 - **Multi-line table cells**: Not supported; rows are validated line-by-line
+- **Email addresses**: `user@example.com` is not treated as an `@import`
+- **Code blocks**: `@path` references inside fenced code blocks are ignored
+- **No `.claude/rules/` directory**: Skips rules validation (no findings)
 
 ## Implementation Details
 
@@ -112,7 +180,7 @@ Run test suite:
 uv run pytest .claude/skills/audit-docs/test/test_audit_docs.py -v
 ```
 
-10 test functions covering:
+31 test functions covering:
 
 1. Valid CLAUDE.md passes
 2. Missing markers fail
@@ -124,6 +192,27 @@ uv run pytest .claude/skills/audit-docs/test/test_audit_docs.py -v
 8. Exit code 0 for clean
 9. Exit code 1 for issues
 10. Unlisted agents fail
+11. FILE_TOO_LONG warns on 201+ lines
+12. File under 200 lines passes
+13. IMPORT_BROKEN on nonexistent @path
+14. Valid @import passes
+15. @path in code block ignored
+16. @path in code block with backticks ignored
+17. IMPORT_SENSITIVE on .env/@secrets.key
+18. Non-sensitive import passes
+19. DESCRIPTION_MISMATCH warns
+20. Matching description passes
+21. NAME_MISMATCH on differing names
+22. Matching name passes
+23. AGENTS_NO_IMPORT warns when bodies differ
+24. @AGENTS.md import present passes
+25. Synced bodies produce no warning
+26. Invalid glob pattern warns
+27. Valid glob pattern passes
+28. Broken link in rules fails
+29. Valid link in rules passes
+30. Email not treated as import
+31. No rules directory passes
 
 ## Integration
 

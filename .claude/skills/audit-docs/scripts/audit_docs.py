@@ -14,6 +14,10 @@ Validates:
 - Skill completeness (all skills listed unless unlisted: true)
 - Agent completeness (all agents listed)
 - Synchronization (AGENTS.md body matches CLAUDE.md)
+- File-level checks (FILE_TOO_LONG, IMPORT_BROKEN, IMPORT_SENSITIVE)
+- Cross-reference accuracy (DESCRIPTION_MISMATCH, NAME_MISMATCH)
+- AGENTS.md import check (AGENTS_NO_IMPORT)
+- Rules directory validation (RULES_INVALID_PATHS, RULES_BROKEN_LINK)
 
 Exit codes:
 - 0: All checks passed
@@ -201,6 +205,37 @@ def extract_table_names(table_text: str) -> set[str]:
     return names
 
 
+_LINK_PATTERN = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
+
+
+def strip_code_blocks(text: str) -> str:
+    """Remove fenced code blocks from markdown text."""
+    return re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+
+
+def extract_table_rows(table_text: str) -> list[dict[str, str]]:
+    """
+    Extract rows from a markdown table as dicts with keys: name, description, link.
+
+    Parses data rows (skipping header and separator) and extracts the three columns.
+    The link column value is the raw cell text (may contain markdown link syntax).
+    """
+    rows: list[dict[str, str]] = []
+    lines = [l for l in table_text.splitlines() if l.strip()]
+
+    # Skip header and separator rows
+    for line in lines[2:]:
+        cols = [c.strip() for c in line.split("|") if c.strip()]
+        if len(cols) >= 3:
+            rows.append({
+                "name": cols[0],
+                "description": cols[1],
+                "link": cols[2],
+            })
+
+    return rows
+
+
 def validate_claude_md(repo_path: Path) -> Report:
     """Validate CLAUDE.md file."""
     findings: list[Finding] = []
@@ -296,6 +331,32 @@ def validate_claude_md(repo_path: Path) -> Report:
             if agent_name not in listed_agents:
                 findings.append(Finding("ERROR", "AGENT_UNLISTED", f"Agent '{agent_name}' not listed in CLAUDE.md table", str(agent_file), None))
 
+    # Cross-reference checks: DESCRIPTION_MISMATCH and NAME_MISMATCH
+    for table_text in [skill_table_text, agent_table_text]:
+        if not table_text:
+            continue
+        for row in extract_table_rows(table_text):
+            link_match = re.search(r'\[([^\]]*)\]\(([^)]+)\)', row["link"])
+            if not link_match:
+                continue
+            link_path = link_match.group(2).strip()
+            target = repo_path / link_path
+            if not target.exists():
+                continue
+            target_text = target.read_text(encoding="utf-8")
+            fm, _, had_fm = parse_frontmatter(target_text)
+            if not had_fm:
+                continue
+            # NAME_MISMATCH
+            fm_name = fm.get("name", "").strip()
+            if fm_name and row["name"] != fm_name:
+                findings.append(Finding("ERROR", "NAME_MISMATCH", f"Table name '{row['name']}' differs from frontmatter name '{fm_name}' in {link_path}", str(claude_path), None))
+            # DESCRIPTION_MISMATCH
+            fm_desc = fm.get("description", "").strip()
+            table_desc = row["description"].strip()
+            if fm_desc and table_desc and fm_desc != table_desc:
+                findings.append(Finding("WARN", "DESCRIPTION_MISMATCH", f"Table description for '{row['name']}' differs from frontmatter in {link_path}", str(claude_path), None))
+
     return Report(findings)
 
 
@@ -335,6 +396,145 @@ def validate_agents_sync(repo_path: Path) -> Report:
     return Report(findings)
 
 
+def validate_file_level(repo_path: Path) -> Report:
+    """
+    File-level checks for CLAUDE.md.
+
+    Checks:
+    - FILE_TOO_LONG: CLAUDE.md over 200 lines
+    - IMPORT_BROKEN: @path imports that don't resolve
+    - IMPORT_SENSITIVE: @path imports to sensitive files
+    """
+    findings: list[Finding] = []
+    claude_path = repo_path / "CLAUDE.md"
+
+    if not claude_path.exists():
+        return Report(findings)
+
+    text = claude_path.read_text(encoding="utf-8")
+
+    # FILE_TOO_LONG
+    line_count = len(text.splitlines())
+    if line_count > 200:
+        findings.append(Finding("WARN", "FILE_TOO_LONG", f"CLAUDE.md has {line_count} lines (recommended max: 200)", str(claude_path), None))
+
+    # IMPORT_BROKEN and IMPORT_SENSITIVE
+    # Strip code blocks first so we don't flag @paths inside them
+    text_no_code = strip_code_blocks(text)
+
+    # Pattern: @ followed by a file path, but NOT email addresses
+    # Import pattern: @path/to/file or @filename.ext (starts with . or word, contains / or .)
+    import_pattern = re.compile(r'(?<!\w)@(\.?[\w][\w./\-]*)')
+
+    sensitive_patterns = [".env", ".pem", ".key", "credentials", "secret", "password", "token"]
+    # File extensions recognized as imports (not email domains)
+    file_extensions = {'.md', '.py', '.js', '.ts', '.yml', '.yaml', '.json', '.toml', '.txt', '.sh', '.env', '.pem', '.key'}
+
+    for match in import_pattern.finditer(text_no_code):
+        import_path = match.group(1)
+
+        # Must contain a path separator or file extension to be considered an import
+        if '/' not in import_path and '.' not in import_path:
+            continue
+
+        # For bare names without slashes (e.g., "example.com" vs "AGENTS.md"),
+        # skip email-domain-like patterns that don't have recognized file extensions
+        if '/' not in import_path and re.match(r'^[\w-]+\.\w+$', import_path):
+            if not any(import_path.endswith(ext) for ext in file_extensions):
+                continue
+
+        resolved = repo_path / import_path
+        if not resolved.exists():
+            findings.append(Finding("ERROR", "IMPORT_BROKEN", f"Broken import: @{import_path}", str(claude_path), None))
+        else:
+            filename = Path(import_path).name.lower()
+            if any(pat in filename for pat in sensitive_patterns):
+                findings.append(Finding("WARN", "IMPORT_SENSITIVE", f"Import references sensitive file: @{import_path}", str(claude_path), None))
+
+    return Report(findings)
+
+
+def validate_agents_import(repo_path: Path) -> Report:
+    """
+    Check if CLAUDE.md should import AGENTS.md.
+
+    AGENTS_NO_IMPORT: Warns when AGENTS.md exists, CLAUDE.md lacks @AGENTS.md import,
+    and the bodies are NOT already synchronized.
+    """
+    findings: list[Finding] = []
+    claude_path = repo_path / "CLAUDE.md"
+    agents_path = repo_path / "AGENTS.md"
+
+    if not agents_path.exists() or not claude_path.exists():
+        return Report(findings)
+
+    claude_text = claude_path.read_text(encoding="utf-8")
+    agents_text = agents_path.read_text(encoding="utf-8")
+
+    # Check if @AGENTS.md appears outside code blocks
+    text_no_code = strip_code_blocks(claude_text)
+    has_import = bool(re.search(r'(?<!\w)@AGENTS\.md', text_no_code))
+
+    if has_import:
+        return Report(findings)
+
+    # Check if bodies are in sync
+    claude_lines = claude_text.splitlines()
+    agents_lines = agents_text.splitlines()
+    claude_body = "\n".join(claude_lines[1:]) if len(claude_lines) > 1 else ""
+    agents_body = "\n".join(agents_lines[1:]) if len(agents_lines) > 1 else ""
+
+    if claude_body.strip() == agents_body.strip():
+        # Bodies in sync — no warning needed
+        return Report(findings)
+
+    findings.append(Finding("WARN", "AGENTS_NO_IMPORT", "CLAUDE.md lacks @AGENTS.md import while AGENTS.md exists and bodies differ", str(claude_path), None))
+
+    return Report(findings)
+
+
+def validate_rules_dir(repo_path: Path) -> Report:
+    """
+    Validate .claude/rules/ directory.
+
+    Checks:
+    - RULES_INVALID_PATHS: Invalid glob patterns in frontmatter
+    - RULES_BROKEN_LINK: Broken markdown links in rule files
+    """
+    findings: list[Finding] = []
+    rules_dir = repo_path / ".claude/rules"
+
+    if not rules_dir.exists():
+        return Report(findings)
+
+    for rule_file in rules_dir.glob("*.md"):
+        rule_text = rule_file.read_text(encoding="utf-8")
+        fm, body, had_fm = parse_frontmatter(rule_text)
+
+        # RULES_INVALID_PATHS: validate glob patterns
+        if had_fm and "globs" in fm:
+            globs_value = fm["globs"]
+            # Handle comma-separated globs
+            patterns = [p.strip() for p in globs_value.split(",")]
+            for pattern in patterns:
+                if not pattern:
+                    continue
+                if pattern.count('[') != pattern.count(']'):
+                    findings.append(Finding("WARN", "RULES_INVALID_PATHS", f"Invalid glob pattern '{pattern}' in {rule_file.name}: unbalanced brackets", str(rule_file), None))
+
+        # RULES_BROKEN_LINK: check markdown links
+        for match in _LINK_PATTERN.finditer(body if had_fm else rule_text):
+            link_path = match.group(2).strip()
+            # Skip external links
+            if link_path.startswith(("http://", "https://", "#", "mailto:")):
+                continue
+            target = repo_path / link_path
+            if not target.exists():
+                findings.append(Finding("ERROR", "RULES_BROKEN_LINK", f"Broken link '{link_path}' in {rule_file.name}", str(rule_file), None))
+
+    return Report(findings)
+
+
 def format_report(report: Report) -> str:
     """Format report as human-readable text."""
     if not report.findings:
@@ -367,9 +567,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Run validations
     claude_report = validate_claude_md(repo_path)
     sync_report = validate_agents_sync(repo_path)
+    file_level_report = validate_file_level(repo_path)
+    agents_import_report = validate_agents_import(repo_path)
+    rules_report = validate_rules_dir(repo_path)
 
     # Combine findings
-    all_findings = claude_report.findings + sync_report.findings
+    all_findings = (claude_report.findings + sync_report.findings +
+                    file_level_report.findings + agents_import_report.findings +
+                    rules_report.findings)
     combined_report = Report(all_findings)
 
     # Print report
