@@ -1017,3 +1017,46 @@ def test_no_rules_dir_passes(tmp_path: Path) -> None:
 
     assert "RULES_INVALID_PATHS" not in result.stdout
     assert "RULES_BROKEN_LINK" not in result.stdout
+
+
+# =============================================================================
+# Inline code span tests (strip_code_blocks fix)
+# =============================================================================
+
+
+def test_import_in_inline_code_ignored(tmp_path: Path) -> None:
+    """Test that @path inside inline backticks is NOT flagged as IMPORT_BROKEN."""
+    claude_text = _minimal_claude_md() + "\nSee `@nonexistent/path.md` for details.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "IMPORT_BROKEN" not in result.stdout
+
+
+# =============================================================================
+# IMPORT_SENSITIVE directory path tests
+# =============================================================================
+
+
+def test_import_sensitive_directory_warns(tmp_path: Path) -> None:
+    """Test that @secrets/config.md triggers IMPORT_SENSITIVE when path contains sensitive dir."""
+    secrets_dir = tmp_path / "secrets"
+    secrets_dir.mkdir()
+    (secrets_dir / "config.md").write_text("# Config\n")
+    claude_text = _minimal_claude_md() + "\nSee @secrets/config.md for details.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "IMPORT_SENSITIVE" in result.stdout

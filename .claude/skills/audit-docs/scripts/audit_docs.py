@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import fnmatch
 import re
 import sys
 from pathlib import Path
@@ -177,12 +178,14 @@ def validate_table(table_text: str, file: str, line: int) -> list[Finding]:
     return findings
 
 
+_LINK_PATTERN = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
+
+
 def extract_table_links(table_text: str) -> list[str]:
     """Extract file paths from markdown links in table."""
     links: list[str] = []
-    link_pattern = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
 
-    for match in link_pattern.finditer(table_text):
+    for match in _LINK_PATTERN.finditer(table_text):
         link_path = match.group(2).strip()
         # Filter out external links and anchors
         if not link_path.startswith(("http://", "https://", "#", "mailto:")):
@@ -205,12 +208,11 @@ def extract_table_names(table_text: str) -> set[str]:
     return names
 
 
-_LINK_PATTERN = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
-
-
 def strip_code_blocks(text: str) -> str:
-    """Remove fenced code blocks from markdown text."""
-    return re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+    """Remove fenced code blocks and inline code spans from markdown text."""
+    text = re.sub(r'^```[^\n]*\n.*?^```', '', text, flags=re.DOTALL | re.MULTILINE)
+    text = re.sub(r'`[^`]+`', '', text)
+    return text
 
 
 def extract_table_rows(table_text: str) -> list[dict[str, str]]:
@@ -447,8 +449,8 @@ def validate_file_level(repo_path: Path) -> Report:
         if not resolved.exists():
             findings.append(Finding("ERROR", "IMPORT_BROKEN", f"Broken import: @{import_path}", str(claude_path), None))
         else:
-            filename = Path(import_path).name.lower()
-            if any(pat in filename for pat in sensitive_patterns):
+            import_path_lower = import_path.lower()
+            if any(pat in import_path_lower for pat in sensitive_patterns):
                 findings.append(Finding("WARN", "IMPORT_SENSITIVE", f"Import references sensitive file: @{import_path}", str(claude_path), None))
 
     return Report(findings)
@@ -521,6 +523,11 @@ def validate_rules_dir(repo_path: Path) -> Report:
                     continue
                 if pattern.count('[') != pattern.count(']'):
                     findings.append(Finding("WARN", "RULES_INVALID_PATHS", f"Invalid glob pattern '{pattern}' in {rule_file.name}: unbalanced brackets", str(rule_file), None))
+                    continue
+                try:
+                    re.compile(fnmatch.translate(pattern))
+                except re.error:
+                    findings.append(Finding("WARN", "RULES_INVALID_PATHS", f"Invalid glob pattern '{pattern}' in {rule_file.name}", str(rule_file), None))
 
         # RULES_BROKEN_LINK: check markdown links
         for match in _LINK_PATTERN.finditer(body if had_fm else rule_text):

@@ -105,7 +105,7 @@ CLAUDE.md should import AGENTS.md when it exists and bodies differ:
 Glob patterns in `.claude/rules/*.md` frontmatter must be valid:
 
 - Validates `globs` field in each rule file's frontmatter
-- Uses `fnmatch` to verify pattern validity
+- Checks bracket balance and uses `fnmatch` to verify pattern validity
 - Graceful no-op when `.claude/rules/` doesn't exist
 - Severity: WARN
 
