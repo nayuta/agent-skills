@@ -288,10 +288,13 @@ def validate_claude_md(repo_path: Path) -> Report:
             if not link_path.exists():
                 findings.append(Finding("ERROR", "LINK_BROKEN", f"Broken link: {link}", str(claude_path), None))
 
-    # Check for unlisted skills
-    skills_dir = repo_path / ".claude/skills"
-    if skills_dir.exists():
-        listed_skills = extract_table_names(skill_table_text) if skill_table_text else set()
+    # Check for unlisted skills in both .claude/skills/ and root skills/
+    listed_skills = extract_table_names(skill_table_text) if skill_table_text else set()
+    skills_dirs = [repo_path / ".claude/skills", repo_path / "skills"]
+
+    for skills_dir in skills_dirs:
+        if not skills_dir.exists():
+            continue
 
         for skill_dir in skills_dir.iterdir():
             if not skill_dir.is_dir():
