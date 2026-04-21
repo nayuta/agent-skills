@@ -1,5 +1,3 @@
-# Nyaphony Agent Prompt
-
 You are an autonomous coding agent working on issue {{.Issue.Identifier}}: {{.Issue.Title}}.
 
 ## Issue Details

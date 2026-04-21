@@ -1,3 +1,5 @@
+$schema: ../workflow.schema.json
+
 server:
   port: 18084
 
@@ -42,28 +44,50 @@ coding_agent:
 orchestrator:
   poll_interval: 60
   max_concurrent: 3
-  max_retries: 5
-  # dispatch_order: ticket_priority
+  max_retries: 1
+  dispatch_order: ticket_priority
   workflows:
-    - name: planning
-      priority: -10
-      enabled: true
+    - name: plan-draft
+      priority: -20
+      max_retries: 1
       filter:
         states:
           - Todo
         exclude_labels:
+          - "Plan Drafted"
           - "No Automation"
           - Blocked
+          - Delayed
+      command: "/ticket:plan-draft {{.Issue.Identifier}}"
+      use_workspace: false
+      on_success:
+        add_label: "Plan Drafted"
+        require_comment: "## Plan: Draft Ready"
+
+    - name: plan-review-fix
+      priority: -10
+      max_retries: 3
+      filter:
+        states:
+          - Todo
+        require_labels:
+          - "Plan Drafted"
+        exclude_labels:
           - Planned
-      command: "/ticket:plan {{.Issue.Identifier}}"
+          - "No Automation"
+          - Blocked
+          - Delayed
+      command: "/ticket:plan-review-fix {{.Issue.Identifier}}"
       use_workspace: false
       on_success:
         add_label: Planned
+        remove_label: "Plan Drafted"
         require_comment: "## Implementation Plan"
+        retry_on_comment_mismatch: true
 
-    - name: development
+    - name: develop-impl
       priority: 0
-      enabled: true
+      max_retries: 1
       filter:
         states:
           - Todo
@@ -71,20 +95,67 @@ orchestrator:
         require_labels:
           - Planned
         exclude_labels:
+          - "Implementation Done"
           - "No Automation"
           - Blocked
-          - "PR Created"
-      command: "/ticket:develop {{.Issue.Identifier}}"
+          - Delayed
+      command: "/ticket:develop-impl {{.Issue.Identifier}}"
       use_workspace: false
       use_worktree: true
       on_start:
         transition_state: "In Progress"
       on_success:
-        add_label_if_pr: "PR Created"
+        add_label: "Implementation Done"
+        remove_label: Planned
+        require_comment: "## Implementation: Done"
+
+    - name: develop-review-fix
+      priority: 5
+      max_retries: 5
+      filter:
+        states:
+          - "In Progress"
+        require_labels:
+          - "Implementation Done"
+        exclude_labels:
+          - "PR Created"
+          - "No Automation"
+          - Blocked
+          - Delayed
+      command: "/ticket:develop-review-fix {{.Issue.Identifier}}"
+      use_workspace: false
+      use_worktree: true
+      on_success:
+        add_label: "PR Created"
+        remove_label: "Implementation Done"
+        require_comment: "## Review: Clean"
+        retry_on_comment_mismatch: true
+
+    - name: develop-verify
+      priority: 10
+      filter:
+        states:
+          - "In Progress"
+        require_labels:
+          - "PR Created"
+        exclude_labels:
+          - "No Automation"
+          - Blocked
+          - Delayed
+          - "Requirements Verified"
+      command: "/ticket:develop-verify {{.Issue.Identifier}}"
+      use_workspace: false
+      use_worktree: true
+      on_success:
+        transition_state: "Ready for Review"
+        add_label: "Requirements Verified"
+        remove_label: "PR Created"
+        require_comment: "## Requirements: Verified"
 
     - name: bot-review-fix
-      priority: 10
-      enabled: true
+      priority: 15
+      enabled: false
+      max_retries: 3
       filter:
         states:
           - "In Progress"
@@ -94,6 +165,7 @@ orchestrator:
           - "No Automation"
           - "Bot Review Fixed"
           - Blocked
+          - Delayed
       command: "/ticket:develop-bot-review-fix {{.Issue.Identifier}}"
       use_workspace: false
       use_worktree: true
@@ -103,49 +175,28 @@ orchestrator:
         poll_interval: 60
         max_wait: 600
         max_fix_iterations: 3
-        fallback_command: "/ticket:develop-review-fix {{.Issue.Identifier}} --max-iterations 3"
       on_success:
         transition_state: "Ready for Review"
         add_label: "Bot Review Fixed"
+        remove_label: "PR Created"
+        require_comment: "## (Bot Review: Fixed|Review: Clean)"
+        retry_on_comment_mismatch: true
 
     - name: conflict-resolution
-      priority: 15
-      enabled: false
+      priority: 20
       filter:
         states:
           - "Ready for Review"
         exclude_labels:
           - "No Automation"
           - Blocked
+          - Delayed
           - "Conflicts Resolved"
         require_conflicts: true
       command: "/integration:pr-conflict {{.Issue.PRURL}}"
       use_workspace: false
-      on_start:
-        add_label: "Conflict Resolution In Progress"
       on_success:
         add_label: "Conflicts Resolved"
-
-    - name: requirements-verification
-      priority: 20
-      enabled: false
-      filter:
-        states:
-          - "In Progress"
-        require_labels:
-          - bot-review-fixed
-        exclude_labels:
-          - "No Automation"
-          - blocked
-          - requirements-verified
-        assignees:
-          - $ASSIGNEE_EMAIL
-      command: "/ticket:verify {{.Issue.Identifier}}"
-      use_workspace: false
-      use_worktree: true
-      on_success:
-        transition_state: "Ready for Review"
-        add_label: requirements-verified
 
 workspace:
   root: ~/workspaces/agent-skills
