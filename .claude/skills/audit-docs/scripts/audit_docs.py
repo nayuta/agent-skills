@@ -18,6 +18,7 @@ Validates:
 - Cross-reference accuracy (DESCRIPTION_MISMATCH, NAME_MISMATCH)
 - AGENTS.md import check (AGENTS_NO_IMPORT)
 - Rules directory validation (RULES_INVALID_PATHS, RULES_BROKEN_LINK)
+- Body-sensitive content (BODY_SENSITIVE)
 
 Exit codes:
 - 0: All checks passed
@@ -545,6 +546,50 @@ def validate_rules_dir(repo_path: Path) -> Report:
     return Report(findings)
 
 
+def validate_body_sensitive(repo_path: Path) -> Report:
+    """
+    Check CLAUDE.md body text for hardcoded secrets.
+
+    Scans outside fenced code blocks for patterns like API keys,
+    Bearer tokens, password assignments, and database connection strings.
+    Complements IMPORT_SENSITIVE which only checks @path import targets.
+    """
+    findings: list[Finding] = []
+    claude_path = repo_path / "CLAUDE.md"
+
+    if not claude_path.exists():
+        return Report(findings)
+
+    text = claude_path.read_text(encoding="utf-8")
+    text_no_code = strip_code_blocks(text)
+
+    secret_patterns: list[tuple[str, re.Pattern[str]]] = [
+        ("AWS access key", re.compile(r'AKIA[0-9A-Z]{16}')),
+        ("Bearer token", re.compile(r'Bearer\s+[A-Za-z0-9\-._~+/]{20,}=*', re.IGNORECASE)),
+        ("API key assignment", re.compile(r'(?:api[_-]?key|apikey)\s*[:=]\s*\S+', re.IGNORECASE)),
+        ("password assignment", re.compile(r'(?:password|passwd|pwd)\s*[:=]\s*\S+', re.IGNORECASE)),
+        ("secret/token assignment", re.compile(r'(?:secret|token)\s*[:=]\s*\S{8,}', re.IGNORECASE)),
+        ("database connection string", re.compile(r'(?:mysql|postgres|mongodb|redis)://[^\s]+@[^\s]+', re.IGNORECASE)),
+    ]
+
+    matched_regions: set[tuple[int, int]] = set()
+
+    for label, pattern in secret_patterns:
+        for match in pattern.finditer(text_no_code):
+            span = (match.start(), match.end())
+            if span not in matched_regions:
+                matched_regions.add(span)
+                matched_text = match.group()
+                msg = (
+                    f"Possible {label} in CLAUDE.md body: '{matched_text[:50]}...'"
+                    if len(matched_text) > 50
+                    else f"Possible {label} in CLAUDE.md body: '{matched_text}'"
+                )
+                findings.append(Finding("WARN", "BODY_SENSITIVE", msg, str(claude_path), None))
+
+    return Report(findings)
+
+
 def format_report(report: Report) -> str:
     """Format report as human-readable text."""
     if not report.findings:
@@ -580,11 +625,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     file_level_report = validate_file_level(repo_path)
     agents_import_report = validate_agents_import(repo_path)
     rules_report = validate_rules_dir(repo_path)
+    body_sensitive_report = validate_body_sensitive(repo_path)
 
     # Combine findings
     all_findings = (claude_report.findings + sync_report.findings +
                     file_level_report.findings + agents_import_report.findings +
-                    rules_report.findings)
+                    rules_report.findings + body_sensitive_report.findings)
     combined_report = Report(all_findings)
 
     # Print report

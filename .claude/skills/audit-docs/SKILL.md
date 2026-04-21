@@ -120,6 +120,16 @@ Markdown links in `.claude/rules/*.md` files must resolve:
 - Graceful no-op when `.claude/rules/` doesn't exist
 - Severity: ERROR
 
+### 15. Body Sensitive Content (BODY_SENSITIVE)
+
+CLAUDE.md body text must not contain hardcoded secrets:
+
+- Scans text outside fenced code blocks for secret patterns
+- Detects: AWS access keys, Bearer tokens, API key assignments, password assignments, secret/token assignments, database connection strings
+- Complements IMPORT_SENSITIVE (which only checks `@path` import targets)
+- Only scans CLAUDE.md (AGENTS.md is intentionally excluded)
+- Severity: WARN
+
 ## Usage
 
 ### Basic Validation
@@ -181,7 +191,7 @@ Run test suite:
 uv run pytest .claude/skills/audit-docs/test/test_audit_docs.py -v
 ```
 
-36 test functions covering:
+42 test functions covering:
 
 1. Valid CLAUDE.md passes
 2. Missing markers fail
@@ -219,6 +229,12 @@ uv run pytest .claude/skills/audit-docs/test/test_audit_docs.py -v
 34. No rules directory passes
 35. @path in inline code ignored
 36. IMPORT_SENSITIVE on sensitive directories
+37. BODY_SENSITIVE on API key assignment
+38. BODY_SENSITIVE on database connection string
+39. Clean CLAUDE.md produces no BODY_SENSITIVE
+40. Secrets in code blocks ignored by BODY_SENSITIVE
+41. BODY_SENSITIVE on Bearer token
+42. BODY_SENSITIVE on AWS access key
 
 ## Integration
 

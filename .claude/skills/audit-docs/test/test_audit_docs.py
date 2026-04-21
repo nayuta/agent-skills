@@ -1162,6 +1162,107 @@ def test_rules_valid_link_passes(tmp_path: Path) -> None:
 
 
 # =============================================================================
+# BODY_SENSITIVE tests
+# =============================================================================
+
+
+def test_body_sensitive_api_key_warns(tmp_path: Path) -> None:
+    """Test that API key assignment in CLAUDE.md body triggers BODY_SENSITIVE."""
+    claude_text = _minimal_claude_md() + "\nSet api_key = sk-abc123xyz in your config.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" in result.stdout
+    assert result.returncode == 0  # WARN severity, not ERROR
+
+
+def test_body_sensitive_password_in_url_warns(tmp_path: Path) -> None:
+    """Test that database connection string with credentials triggers BODY_SENSITIVE."""
+    claude_text = _minimal_claude_md() + "\nConnect via postgres://admin:p4ssw0rd@localhost/db\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" in result.stdout
+
+
+def test_body_sensitive_clean_passes(tmp_path: Path) -> None:
+    """Test that clean CLAUDE.md without secrets produces no BODY_SENSITIVE."""
+    claude_text = _minimal_claude_md() + "\nUse environment variables for secrets. Never hardcode passwords or tokens in documentation.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_in_code_block_ignored(tmp_path: Path) -> None:
+    """Test that secrets inside fenced code blocks are NOT flagged."""
+    claude_text = _minimal_claude_md() + dedent("""\
+
+        ```
+        api_key = sk-abc123xyz
+        ```
+        """)
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_bearer_token_warns(tmp_path: Path) -> None:
+    """Test that Bearer token with 20+ char value triggers BODY_SENSITIVE."""
+    claude_text = _minimal_claude_md() + "\nAuthorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" in result.stdout
+
+
+def test_body_sensitive_aws_key_warns(tmp_path: Path) -> None:
+    """Test that AWS access key pattern triggers BODY_SENSITIVE."""
+    claude_text = _minimal_claude_md() + "\nAWS key: AKIAIOSFODNN7EXAMPLE\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" in result.stdout
+
+
+# =============================================================================
 # Edge case tests
 # =============================================================================
 
