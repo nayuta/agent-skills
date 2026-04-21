@@ -578,9 +578,22 @@ def validate_body_sensitive(repo_path: Path) -> Report:
     for label, pattern in secret_patterns:
         for match in pattern.finditer(text_no_code):
             span = (match.start(), match.end())
-            if not any(s <= span[0] < e or s < span[1] <= e for s, e in matched_regions):
-                matched_regions.append(span)
+            if not any(s <= span[0] < e or s < span[1] <= e or (span[0] <= s and span[1] >= e) for s, e in matched_regions):
                 matched_text = match.group()
+                # Skip placeholder values in key=value patterns
+                kv_match = re.search(r'[:=]\s*(\S)', matched_text)
+                if kv_match and kv_match.group(1) in ('$', '<', '{'):
+                    continue
+                if 'ENV[' in matched_text.upper():
+                    continue
+                # Skip bearer tokens that look like placeholders
+                if label == "Bearer token":
+                    token_part = matched_text.split(None, 1)[1] if ' ' in matched_text or '	' in matched_text else ''
+                    if re.search(r'[<>{}]', token_part):
+                        continue
+                    if re.search(r'\b(?:your|example|placeholder|token|here|sample)\b', token_part, re.IGNORECASE):
+                        continue
+                matched_regions.append(span)
                 msg = (
                     f"Possible {label} in CLAUDE.md body: '{matched_text[:50]}...'"
                     if len(matched_text) > 50
