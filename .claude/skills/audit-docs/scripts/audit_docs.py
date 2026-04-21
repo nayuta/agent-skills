@@ -212,6 +212,7 @@ def extract_table_names(table_text: str) -> set[str]:
 def strip_code_blocks(text: str) -> str:
     """Remove fenced code blocks and inline code spans from markdown text."""
     text = re.sub(r'^```[^\n]*\n.*?^```', '', text, flags=re.DOTALL | re.MULTILINE)
+    text = re.sub(r'^~~~[^\n]*\n.*?^~~~', '', text, flags=re.DOTALL | re.MULTILINE)
     text = re.sub(r'`[^`]+`', '', text)
     return text
 
@@ -567,18 +568,18 @@ def validate_body_sensitive(repo_path: Path) -> Report:
         ("AWS access key", re.compile(r'AKIA[0-9A-Z]{16}')),
         ("Bearer token", re.compile(r'Bearer\s+[A-Za-z0-9\-._~+/]{20,}=*', re.IGNORECASE)),
         ("API key assignment", re.compile(r'(?:api[_-]?key|apikey)\s*[:=]\s*\S+', re.IGNORECASE)),
-        ("password assignment", re.compile(r'(?:password|passwd|pwd)\s*[:=]\s*\S+', re.IGNORECASE)),
-        ("secret/token assignment", re.compile(r'(?:secret|token)\s*[:=]\s*\S{8,}', re.IGNORECASE)),
+        ("password assignment", re.compile(r'\b(?:password|passwd|pwd)\s*=\s*\S{8,}', re.IGNORECASE)),
+        ("secret/token assignment", re.compile(r'\b(?:secret|token)\s*=\s*\S{8,}', re.IGNORECASE)),
         ("database connection string", re.compile(r'(?:mysql|postgres|mongodb|redis)://[^\s]+@[^\s]+', re.IGNORECASE)),
     ]
 
-    matched_regions: set[tuple[int, int]] = set()
+    matched_regions: list[tuple[int, int]] = []
 
     for label, pattern in secret_patterns:
         for match in pattern.finditer(text_no_code):
             span = (match.start(), match.end())
-            if span not in matched_regions:
-                matched_regions.add(span)
+            if not any(s <= span[0] < e or s < span[1] <= e for s, e in matched_regions):
+                matched_regions.append(span)
                 matched_text = match.group()
                 msg = (
                     f"Possible {label} in CLAUDE.md body: '{matched_text[:50]}...'"
