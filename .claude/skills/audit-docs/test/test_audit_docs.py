@@ -1339,3 +1339,99 @@ def test_import_sensitive_directory_warns(tmp_path: Path) -> None:
     )
 
     assert "IMPORT_SENSITIVE" in result.stdout
+
+
+
+# =============================================================================
+# Placeholder detection with underscore-joined tokens
+# =============================================================================
+
+
+def test_body_sensitive_underscore_placeholder_not_flagged(tmp_path: Path) -> None:
+    """Test that underscore-joined placeholder values like your_api_key are NOT flagged."""
+    claude_text = _minimal_claude_md() + "\nSet api_key = your_api_key in config.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_changeme_with_digits_not_flagged(tmp_path: Path) -> None:
+    """Test that placeholder with trailing digits like changeme123 is NOT flagged."""
+    claude_text = _minimal_claude_md() + "\npassword = changeme123\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_replace_this_value_not_flagged(tmp_path: Path) -> None:
+    """Test that underscore-joined replace_this_value is NOT flagged."""
+    claude_text = _minimal_claude_md() + "\nsecret = replace_this_value\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_sample_token_value_not_flagged(tmp_path: Path) -> None:
+    """Test that sample_token_value placeholder is NOT flagged."""
+    claude_text = _minimal_claude_md() + "\ntoken = sample_token_value\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_example_between_underscores_not_flagged(tmp_path: Path) -> None:
+    """Test that my_example_key placeholder is NOT flagged."""
+    claude_text = _minimal_claude_md() + "\napi_key = my_example_key\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_real_secret_still_flagged(tmp_path: Path) -> None:
+    """Test that real-looking secrets are still flagged (no regression)."""
+    claude_text = _minimal_claude_md() + "\napi_key = sk-abc123xyz in your config.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" in result.stdout

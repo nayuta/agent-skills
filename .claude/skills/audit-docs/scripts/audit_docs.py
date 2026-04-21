@@ -570,14 +570,14 @@ def validate_body_sensitive(repo_path: Path) -> Report:
         ("API key assignment", re.compile(r'(?:api[_-]?key|apikey)\s*[:=]\s*\S+', re.IGNORECASE)),
         ("password assignment", re.compile(r'\b(?:password|passwd|pwd)\s*=\s*\S{8,}', re.IGNORECASE)),
         ("secret/token assignment", re.compile(r'\b(?:secret|token)\s*=\s*\S{8,}', re.IGNORECASE)),
-        ("database connection string", re.compile(r'(?:mysql|postgres|mongodb|redis)://[^\s]+@[^\s]+', re.IGNORECASE)),
+        ("database connection string", re.compile(r'(?:mysql|postgres(?:ql)?|mongodb|redis)://[^\s]+@[^\s]+', re.IGNORECASE)),
     ]
 
     matched_regions: list[tuple[int, int]] = []
 
     # Common placeholder words used in documentation examples
     _PLACEHOLDER_WORDS_RE = re.compile(
-        r'\b(?:your|replace|example|xxx|changeme|placeholder|sample|here)\b',
+        r'(?<![a-zA-Z])(?:your|replace|example|xxx|changeme|placeholder|sample|here)(?![a-zA-Z])',
         re.IGNORECASE,
     )
 
@@ -606,7 +606,8 @@ def validate_body_sensitive(repo_path: Path) -> Report:
 
             # Skip bearer tokens that look like placeholders
             if label == "Bearer token":
-                token_part = matched_text.split(None, 1)[1] if ' ' in matched_text or '\t' in matched_text else ''
+                parts = matched_text.split(None, 1)
+                token_part = parts[1] if len(parts) > 1 else ''
                 if re.search(r'[<>{}]', token_part):
                     continue
                 if _PLACEHOLDER_WORDS_RE.search(token_part):
