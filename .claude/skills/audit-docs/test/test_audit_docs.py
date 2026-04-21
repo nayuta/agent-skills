@@ -3,7 +3,7 @@
 test_audit_docs.py
 
 Test suite for audit_docs.py script.
-Tests the 14 categories of static checks plus exit code behavior.
+Tests the 15 categories of static checks plus exit code behavior.
 """
 from __future__ import annotations
 
@@ -1435,3 +1435,22 @@ def test_body_sensitive_real_secret_still_flagged(tmp_path: Path) -> None:
     )
 
     assert "BODY_SENSITIVE" in result.stdout
+
+
+def test_body_sensitive_in_extended_tilde_fence_ignored(tmp_path: Path) -> None:
+    """Test that secrets inside ~~~~ (4+ tilde) fences are NOT flagged."""
+    claude_text = _minimal_claude_md() + dedent("""
+        ~~~~
+        api_key = sk-abc123xyz
+        ~~~~
+        """)
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout

@@ -211,8 +211,8 @@ def extract_table_names(table_text: str) -> set[str]:
 
 def strip_code_blocks(text: str) -> str:
     """Remove fenced code blocks and inline code spans from markdown text."""
-    text = re.sub(r'^```[^\n]*\n.*?^```', '', text, flags=re.DOTALL | re.MULTILINE)
-    text = re.sub(r'^~~~[^\n]*\n.*?^~~~', '', text, flags=re.DOTALL | re.MULTILINE)
+    text = re.sub(r'^(`{3,})[^\n]*\n.*?^\1', '', text, flags=re.DOTALL | re.MULTILINE)
+    text = re.sub(r'^(~{3,})[^\n]*\n.*?^\1', '', text, flags=re.DOTALL | re.MULTILINE)
     text = re.sub(r'`[^`]+`', '', text)
     return text
 

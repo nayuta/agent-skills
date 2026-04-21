@@ -191,7 +191,7 @@ Run test suite:
 uv run pytest .claude/skills/audit-docs/test/test_audit_docs.py -v
 ```
 
-42 test functions covering:
+49 test functions covering:
 
 1. Valid CLAUDE.md passes
 2. Missing markers fail
@@ -235,6 +235,13 @@ uv run pytest .claude/skills/audit-docs/test/test_audit_docs.py -v
 40. Secrets in code blocks ignored by BODY_SENSITIVE
 41. BODY_SENSITIVE on Bearer token
 42. BODY_SENSITIVE on AWS access key
+43. Underscore-joined placeholder values not flagged
+44. Placeholder with trailing digits not flagged
+45. Underscore-joined replace_this_value not flagged
+46. sample_token_value placeholder not flagged
+47. Placeholder with example between underscores not flagged
+48. Real-looking secrets still flagged (no regression)
+49. Secrets inside 4+ tilde fences ignored by strip_code_blocks
 
 ## Integration
 
