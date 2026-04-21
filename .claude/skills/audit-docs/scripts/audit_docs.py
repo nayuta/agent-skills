@@ -575,31 +575,57 @@ def validate_body_sensitive(repo_path: Path) -> Report:
 
     matched_regions: list[tuple[int, int]] = []
 
+    # Common placeholder words used in documentation examples
+    _PLACEHOLDER_WORDS_RE = re.compile(
+        r'\b(?:your|replace|example|xxx|changeme|placeholder|sample|here)\b',
+        re.IGNORECASE,
+    )
+
     for label, pattern in secret_patterns:
         for match in pattern.finditer(text_no_code):
+            matched_text = match.group()
+
+            # --- Placeholder filtering (before overlap check) ---
+            # Skip placeholder values in key=value patterns
+            kv_match = re.search(r'[:=]\s*(\S)', matched_text)
+            if kv_match and kv_match.group(1) in ('$', '<', '{'):
+                continue
+            if 'ENV[' in matched_text.upper():
+                continue
+
+            # For key=value patterns, extract the value portion for extra checks
+            kv_value_match = re.search(r'[:=]\s*(\S+)', matched_text)
+            if kv_value_match:
+                value_part = kv_value_match.group(1)
+                # Skip ALL_CAPS values (likely env var names like API_KEY, TOKEN_NAME)
+                if re.fullmatch(r'[A-Z][A-Z0-9_]{2,}', value_part):
+                    continue
+                # Skip values containing common placeholder words
+                if _PLACEHOLDER_WORDS_RE.search(value_part):
+                    continue
+
+            # Skip bearer tokens that look like placeholders
+            if label == "Bearer token":
+                token_part = matched_text.split(None, 1)[1] if ' ' in matched_text or '\t' in matched_text else ''
+                if re.search(r'[<>{}]', token_part):
+                    continue
+                if _PLACEHOLDER_WORDS_RE.search(token_part):
+                    continue
+
+            # --- Overlap deduplication (after placeholder filtering) ---
+            # Standard interval overlap: two spans overlap iff neither is
+            # entirely before or entirely after the other.
             span = (match.start(), match.end())
-            if not any(s <= span[0] < e or s < span[1] <= e or (span[0] <= s and span[1] >= e) for s, e in matched_regions):
-                matched_text = match.group()
-                # Skip placeholder values in key=value patterns
-                kv_match = re.search(r'[:=]\s*(\S)', matched_text)
-                if kv_match and kv_match.group(1) in ('$', '<', '{'):
-                    continue
-                if 'ENV[' in matched_text.upper():
-                    continue
-                # Skip bearer tokens that look like placeholders
-                if label == "Bearer token":
-                    token_part = matched_text.split(None, 1)[1] if ' ' in matched_text or '	' in matched_text else ''
-                    if re.search(r'[<>{}]', token_part):
-                        continue
-                    if re.search(r'\b(?:your|example|placeholder|token|here|sample)\b', token_part, re.IGNORECASE):
-                        continue
-                matched_regions.append(span)
-                msg = (
-                    f"Possible {label} in CLAUDE.md body: '{matched_text[:50]}...'"
-                    if len(matched_text) > 50
-                    else f"Possible {label} in CLAUDE.md body: '{matched_text}'"
-                )
-                findings.append(Finding("WARN", "BODY_SENSITIVE", msg, str(claude_path), None))
+            if any(not (span[1] <= s or span[0] >= e) for s, e in matched_regions):
+                continue
+
+            matched_regions.append(span)
+            msg = (
+                f"Possible {label} in CLAUDE.md body: '{matched_text[:50]}...'"
+                if len(matched_text) > 50
+                else f"Possible {label} in CLAUDE.md body: '{matched_text}'"
+            )
+            findings.append(Finding("WARN", "BODY_SENSITIVE", msg, str(claude_path), None))
 
     return Report(findings)
 
