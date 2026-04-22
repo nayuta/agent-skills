@@ -3,7 +3,7 @@
 test_audit_docs.py
 
 Test suite for audit_docs.py script.
-Tests the 14 categories of static checks plus exit code behavior.
+Tests the 15 categories of static checks plus exit code behavior.
 """
 from __future__ import annotations
 
@@ -1162,6 +1162,107 @@ def test_rules_valid_link_passes(tmp_path: Path) -> None:
 
 
 # =============================================================================
+# BODY_SENSITIVE tests
+# =============================================================================
+
+
+def test_body_sensitive_api_key_warns(tmp_path: Path) -> None:
+    """Test that API key assignment in CLAUDE.md body triggers BODY_SENSITIVE."""
+    claude_text = _minimal_claude_md() + "\nSet api_key = sk-abc123xyz in your config.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" in result.stdout
+    assert result.returncode == 0  # WARN severity, not ERROR
+
+
+def test_body_sensitive_password_in_url_warns(tmp_path: Path) -> None:
+    """Test that database connection string with credentials triggers BODY_SENSITIVE."""
+    claude_text = _minimal_claude_md() + "\nConnect via postgres://admin:p4ssw0rd@localhost/db\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" in result.stdout
+
+
+def test_body_sensitive_clean_passes(tmp_path: Path) -> None:
+    """Test that clean CLAUDE.md without secrets produces no BODY_SENSITIVE."""
+    claude_text = _minimal_claude_md() + "\nUse environment variables for secrets. Never hardcode passwords or tokens in documentation.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_in_code_block_ignored(tmp_path: Path) -> None:
+    """Test that secrets inside fenced code blocks are NOT flagged."""
+    claude_text = _minimal_claude_md() + dedent("""\
+
+        ```
+        api_key = sk-abc123xyz
+        ```
+        """)
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_bearer_token_warns(tmp_path: Path) -> None:
+    """Test that Bearer token with 20+ char value triggers BODY_SENSITIVE."""
+    claude_text = _minimal_claude_md() + "\nAuthorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" in result.stdout
+
+
+def test_body_sensitive_aws_key_warns(tmp_path: Path) -> None:
+    """Test that AWS access key pattern triggers BODY_SENSITIVE."""
+    claude_text = _minimal_claude_md() + "\nAWS key: AKIAIOSFODNN7EXAMPLE\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" in result.stdout
+
+
+# =============================================================================
 # Edge case tests
 # =============================================================================
 
@@ -1238,3 +1339,118 @@ def test_import_sensitive_directory_warns(tmp_path: Path) -> None:
     )
 
     assert "IMPORT_SENSITIVE" in result.stdout
+
+
+
+# =============================================================================
+# Placeholder detection with underscore-joined tokens
+# =============================================================================
+
+
+def test_body_sensitive_underscore_placeholder_not_flagged(tmp_path: Path) -> None:
+    """Test that underscore-joined placeholder values like your_api_key are NOT flagged."""
+    claude_text = _minimal_claude_md() + "\nSet api_key = your_api_key in config.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_changeme_with_digits_not_flagged(tmp_path: Path) -> None:
+    """Test that placeholder with trailing digits like changeme123 is NOT flagged."""
+    claude_text = _minimal_claude_md() + "\npassword = changeme123\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_replace_this_value_not_flagged(tmp_path: Path) -> None:
+    """Test that underscore-joined replace_this_value is NOT flagged."""
+    claude_text = _minimal_claude_md() + "\nsecret = replace_this_value\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_sample_token_value_not_flagged(tmp_path: Path) -> None:
+    """Test that sample_token_value placeholder is NOT flagged."""
+    claude_text = _minimal_claude_md() + "\ntoken = sample_token_value\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_example_between_underscores_not_flagged(tmp_path: Path) -> None:
+    """Test that my_example_key placeholder is NOT flagged."""
+    claude_text = _minimal_claude_md() + "\napi_key = my_example_key\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout
+
+
+def test_body_sensitive_real_secret_still_flagged(tmp_path: Path) -> None:
+    """Test that real-looking secrets are still flagged (no regression)."""
+    claude_text = _minimal_claude_md() + "\napi_key = sk-abc123xyz in your config.\n"
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" in result.stdout
+
+
+def test_body_sensitive_in_extended_tilde_fence_ignored(tmp_path: Path) -> None:
+    """Test that secrets inside ~~~~ (4+ tilde) fences are NOT flagged."""
+    claude_text = _minimal_claude_md() + dedent("""
+        ~~~~
+        api_key = sk-abc123xyz
+        ~~~~
+        """)
+    (tmp_path / "CLAUDE.md").write_text(claude_text)
+
+    script = Path(__file__).parent.parent / "scripts/audit_docs.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "BODY_SENSITIVE" not in result.stdout

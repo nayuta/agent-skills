@@ -18,6 +18,7 @@ Validates:
 - Cross-reference accuracy (DESCRIPTION_MISMATCH, NAME_MISMATCH)
 - AGENTS.md import check (AGENTS_NO_IMPORT)
 - Rules directory validation (RULES_INVALID_PATHS, RULES_BROKEN_LINK)
+- Body-sensitive content (BODY_SENSITIVE)
 
 Exit codes:
 - 0: All checks passed
@@ -210,7 +211,8 @@ def extract_table_names(table_text: str) -> set[str]:
 
 def strip_code_blocks(text: str) -> str:
     """Remove fenced code blocks and inline code spans from markdown text."""
-    text = re.sub(r'^```[^\n]*\n.*?^```', '', text, flags=re.DOTALL | re.MULTILINE)
+    text = re.sub(r'^(`{3,})[^\n]*\n.*?^\1', '', text, flags=re.DOTALL | re.MULTILINE)
+    text = re.sub(r'^(~{3,})[^\n]*\n.*?^\1', '', text, flags=re.DOTALL | re.MULTILINE)
     text = re.sub(r'`[^`]+`', '', text)
     return text
 
@@ -545,6 +547,90 @@ def validate_rules_dir(repo_path: Path) -> Report:
     return Report(findings)
 
 
+def validate_body_sensitive(repo_path: Path) -> Report:
+    """
+    Check CLAUDE.md body text for hardcoded secrets.
+
+    Scans outside fenced code blocks for patterns like API keys,
+    Bearer tokens, password assignments, and database connection strings.
+    Complements IMPORT_SENSITIVE which only checks @path import targets.
+    """
+    findings: list[Finding] = []
+    claude_path = repo_path / "CLAUDE.md"
+
+    if not claude_path.exists():
+        return Report(findings)
+
+    text = claude_path.read_text(encoding="utf-8")
+    text_no_code = strip_code_blocks(text)
+
+    secret_patterns: list[tuple[str, re.Pattern[str]]] = [
+        ("AWS access key", re.compile(r'AKIA[0-9A-Z]{16}')),
+        ("Bearer token", re.compile(r'Bearer\s+[A-Za-z0-9\-._~+/]{20,}=*', re.IGNORECASE)),
+        ("API key assignment", re.compile(r'(?:api[_-]?key|apikey)\s*[:=]\s*\S+', re.IGNORECASE)),
+        ("password assignment", re.compile(r'\b(?:password|passwd|pwd)\s*=\s*\S{8,}', re.IGNORECASE)),
+        ("secret/token assignment", re.compile(r'\b(?:secret|token)\s*=\s*\S{8,}', re.IGNORECASE)),
+        ("database connection string", re.compile(r'(?:mysql|postgres(?:ql)?|mongodb|redis)://[^\s]+@[^\s]+', re.IGNORECASE)),
+    ]
+
+    matched_regions: list[tuple[int, int]] = []
+
+    # Common placeholder words used in documentation examples
+    _PLACEHOLDER_WORDS_RE = re.compile(
+        r'(?<![a-zA-Z])(?:your|replace|example|xxx|changeme|placeholder|sample|here)(?![a-zA-Z])',
+        re.IGNORECASE,
+    )
+
+    for label, pattern in secret_patterns:
+        for match in pattern.finditer(text_no_code):
+            matched_text = match.group()
+
+            # --- Placeholder filtering (before overlap check) ---
+            # Skip placeholder values in key=value patterns
+            kv_match = re.search(r'[:=]\s*(\S)', matched_text)
+            if kv_match and kv_match.group(1) in ('$', '<', '{'):
+                continue
+            if 'ENV[' in matched_text.upper():
+                continue
+
+            # For key=value patterns, extract the value portion for extra checks
+            kv_value_match = re.search(r'[:=]\s*(\S+)', matched_text)
+            if kv_value_match:
+                value_part = kv_value_match.group(1)
+                # Skip ALL_CAPS values (likely env var names like API_KEY, TOKEN_NAME)
+                if re.fullmatch(r'[A-Z][A-Z0-9_]{2,}', value_part):
+                    continue
+                # Skip values containing common placeholder words
+                if _PLACEHOLDER_WORDS_RE.search(value_part):
+                    continue
+
+            # Skip bearer tokens that look like placeholders
+            if label == "Bearer token":
+                parts = matched_text.split(None, 1)
+                token_part = parts[1] if len(parts) > 1 else ''
+                if re.search(r'[<>{}]', token_part):
+                    continue
+                if _PLACEHOLDER_WORDS_RE.search(token_part):
+                    continue
+
+            # --- Overlap deduplication (after placeholder filtering) ---
+            # Standard interval overlap: two spans overlap iff neither is
+            # entirely before or entirely after the other.
+            span = (match.start(), match.end())
+            if any(not (span[1] <= s or span[0] >= e) for s, e in matched_regions):
+                continue
+
+            matched_regions.append(span)
+            msg = (
+                f"Possible {label} in CLAUDE.md body: '{matched_text[:50]}...'"
+                if len(matched_text) > 50
+                else f"Possible {label} in CLAUDE.md body: '{matched_text}'"
+            )
+            findings.append(Finding("WARN", "BODY_SENSITIVE", msg, str(claude_path), None))
+
+    return Report(findings)
+
+
 def format_report(report: Report) -> str:
     """Format report as human-readable text."""
     if not report.findings:
@@ -580,11 +666,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     file_level_report = validate_file_level(repo_path)
     agents_import_report = validate_agents_import(repo_path)
     rules_report = validate_rules_dir(repo_path)
+    body_sensitive_report = validate_body_sensitive(repo_path)
 
     # Combine findings
     all_findings = (claude_report.findings + sync_report.findings +
                     file_level_report.findings + agents_import_report.findings +
-                    rules_report.findings)
+                    rules_report.findings + body_sensitive_report.findings)
     combined_report = Report(all_findings)
 
     # Print report
