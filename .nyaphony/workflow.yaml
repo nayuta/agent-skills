@@ -3,6 +3,9 @@ $schema: ../workflow.schema.json
 server:
   port: 18084
 
+metrics:
+  enabled: true
+
 issue_tracker:
   type: linear
   api_key: $LINEAR_API_KEY
@@ -55,6 +58,7 @@ orchestrator:
           - Todo
         exclude_labels:
           - "Plan Drafted"
+          - "PR Created"
           - "No Automation"
           - Blocked
           - Delayed
@@ -74,6 +78,7 @@ orchestrator:
           - "Plan Drafted"
         exclude_labels:
           - Planned
+          - "PR Created"
           - "No Automation"
           - Blocked
           - Delayed
@@ -108,6 +113,30 @@ orchestrator:
         add_label: "PR Created"
         remove_label: Planned
         require_comment: "## Implementation: Done"
+
+    - name: develop-fix-restart
+      priority: 3
+      max_retries: 5
+      filter:
+        states:
+          - Todo
+        require_labels:
+          - "PR Created"
+        exclude_labels:
+          - "PR Reviewed"
+          - "No Automation"
+          - Blocked
+          - Delayed
+      command: "/ticket:develop-review-fix {{.Issue.Identifier}}"
+      use_workspace: false
+      use_worktree: true
+      on_start:
+        transition_state: "In Progress"
+      on_success:
+        add_label: "PR Reviewed"
+        remove_label: "PR Created"
+        require_comment: "## Review: Clean"
+        retry_on_comment_mismatch: true
 
     - name: develop-review-fix
       priority: 5
