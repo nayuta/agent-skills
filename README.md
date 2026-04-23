@@ -30,7 +30,7 @@ npx skills add nayuta/agent-skills --all --global
 | :-------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------- |
 | security-scan   | Runs available security scanning tools against the current project and produces a consolidated markdown report. Pairs with security-review for a complete security workflow.                         | [skills/security-scan/SKILL.md](skills/security-scan/SKILL.md)     |
 | security-review | Comprehensive AI-driven security code review of changes in the current branch. Performs multi-phase vulnerability analysis across 8 categories. Pairs with security-scan for tool-based scanning.    | [skills/security-review/SKILL.md](skills/security-review/SKILL.md) |
-| skill-audit     | Audits Claude Code or Agent Skills directories for structural correctness, risky instructions, trigger scope, coexistence issues, and efficiency regressions. Produces a severity-classified report. | [skills/skill-audit/SKILL.md](skills/skill-audit/SKILL.md)         |
+| audit-skill     | Audits Claude Code or Agent Skills directories for structural correctness, risky instructions, trigger scope, coexistence issues, and efficiency regressions. Produces a severity-classified report. | [skills/audit-skill/SKILL.md](skills/audit-skill/SKILL.md)         |
 
 <!-- REUSABLE_SKILLS_END -->
 
