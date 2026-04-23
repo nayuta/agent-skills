@@ -86,7 +86,7 @@ assert_match "README.md install hint references grype" \
 assert_no_match "SKILL.md grype row has no misconfiguration claim" \
     "misconfiguration" "${SKILL_DIR}/SKILL.md"
 
-# 7. skill-audit score (simplified -- check files exist and have expected content)
+# 7. audit-skill score (simplified -- check files exist and have expected content)
 assert_test "run-scans.sh exists and is executable" \
     test -x "${SKILL_DIR}/scripts/run-scans.sh"
 

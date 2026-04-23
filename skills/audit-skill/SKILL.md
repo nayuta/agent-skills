@@ -1,5 +1,5 @@
 ---
-name: skill-audit
+name: audit-skill
 description: |
   Audits Claude Code or Agent Skills directories for structural correctness, risky
   instructions, trigger scope, coexistence issues, and efficiency regressions.
@@ -31,19 +31,19 @@ AI reasoning (judgment on trigger scope, coexistence, context efficiency).
 Run the bundled auditor from the repository root:
 
 ```bash
-python skills/skill-audit/scripts/skill_audit.py <skill-path> --surface claude-code
+python skills/audit-skill/scripts/skill_audit.py <skill-path> --surface claude-code
 ```
 
 For agent-api mode (strict, requires `name` and `description`):
 
 ```bash
-python skills/skill-audit/scripts/skill_audit.py <skill-path> --surface agent-api
+python skills/audit-skill/scripts/skill_audit.py <skill-path> --surface agent-api
 ```
 
 JSON output for programmatic use:
 
 ```bash
-python skills/skill-audit/scripts/skill_audit.py <skill-path> --json
+python skills/audit-skill/scripts/skill_audit.py <skill-path> --json
 ```
 
 Exit code is non-zero when the worst score drops below 70.
