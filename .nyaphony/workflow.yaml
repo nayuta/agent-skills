@@ -95,7 +95,7 @@ orchestrator:
         require_labels:
           - Planned
         exclude_labels:
-          - "Implementation Done"
+          - "PR Created"
           - "No Automation"
           - Blocked
           - Delayed
@@ -105,7 +105,7 @@ orchestrator:
       on_start:
         transition_state: "In Progress"
       on_success:
-        add_label: "Implementation Done"
+        add_label: "PR Created"
         remove_label: Planned
         require_comment: "## Implementation: Done"
 
@@ -116,9 +116,9 @@ orchestrator:
         states:
           - "In Progress"
         require_labels:
-          - "Implementation Done"
-        exclude_labels:
           - "PR Created"
+        exclude_labels:
+          - "PR Reviewed"
           - "No Automation"
           - Blocked
           - Delayed
@@ -126,8 +126,8 @@ orchestrator:
       use_workspace: false
       use_worktree: true
       on_success:
-        add_label: "PR Created"
-        remove_label: "Implementation Done"
+        add_label: "PR Reviewed"
+        remove_label: "PR Created"
         require_comment: "## Review: Clean"
         retry_on_comment_mismatch: true
 
@@ -137,7 +137,7 @@ orchestrator:
         states:
           - "In Progress"
         require_labels:
-          - "PR Created"
+          - "PR Reviewed"
         exclude_labels:
           - "No Automation"
           - Blocked
@@ -149,7 +149,7 @@ orchestrator:
       on_success:
         transition_state: "Ready for Review"
         add_label: "Requirements Verified"
-        remove_label: "PR Created"
+        remove_label: "PR Reviewed"
         require_comment: "## Requirements: Verified"
 
     - name: bot-review-fix
@@ -160,7 +160,7 @@ orchestrator:
         states:
           - "In Progress"
         require_labels:
-          - "PR Created"
+          - "Requirements Verified"
         exclude_labels:
           - "No Automation"
           - "Bot Review Fixed"
@@ -178,7 +178,7 @@ orchestrator:
       on_success:
         transition_state: "Ready for Review"
         add_label: "Bot Review Fixed"
-        remove_label: "PR Created"
+        remove_label: "Requirements Verified"
         require_comment: "## (Bot Review: Fixed|Review: Clean)"
         retry_on_comment_mismatch: true
 
