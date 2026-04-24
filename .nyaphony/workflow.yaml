@@ -29,6 +29,9 @@ notifications:
   slack:
     enabled: false
     webhook_url: $NYAPHONY_SLACK_WEBHOOK_URL
+    events:
+      - workflow_start
+      - workflow_complete
 
 logging:
   level: debug
@@ -37,10 +40,10 @@ logging:
 
 coding_agent:
   type: claude
-  model: sonnet
+  model: claude-sonnet-4-6
   command: claude
   permission_mode: dangerously-skip-permissions
-  max_turns: 100
+  max_turns: 60
   stall_timeout: 300
   log_level: debug
 
@@ -53,11 +56,13 @@ orchestrator:
     - name: plan-draft
       priority: -20
       max_retries: 1
+      max_parallelism: 2
       filter:
         states:
           - Todo
         exclude_labels:
           - "Plan Drafted"
+          - Planned
           - "PR Created"
           - "No Automation"
           - Blocked
@@ -67,10 +72,14 @@ orchestrator:
       on_success:
         add_label: "Plan Drafted"
         require_comment: "## Plan: Draft Ready"
+      on_failure:
+        add_label: "Automation Failed"
+        command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
     - name: plan-review-fix
       priority: -10
       max_retries: 3
+      max_parallelism: 2
       filter:
         states:
           - Todo
@@ -89,10 +98,15 @@ orchestrator:
         remove_label: "Plan Drafted"
         require_comment: "## Implementation Plan"
         retry_on_comment_mismatch: true
+      on_failure:
+        add_label: "Automation Failed"
+        remove_label: "Plan Drafted"
+        command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
     - name: develop-impl
       priority: 0
       max_retries: 1
+      max_parallelism: 2
       filter:
         states:
           - Todo
@@ -113,10 +127,15 @@ orchestrator:
         add_label: "PR Created"
         remove_label: Planned
         require_comment: "## Implementation: Done"
+      on_failure:
+        add_label: "Automation Failed"
+        remove_label: Planned
+        command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
     - name: develop-fix-restart
       priority: 3
-      max_retries: 5
+      max_retries: 1
+      max_parallelism: 1
       filter:
         states:
           - Todo
@@ -137,10 +156,14 @@ orchestrator:
         remove_label: "PR Created"
         require_comment: "## Review: Clean"
         retry_on_comment_mismatch: true
+      on_failure:
+        add_label: "Automation Failed"
+        command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
     - name: develop-review-fix
       priority: 5
-      max_retries: 5
+      max_retries: 3
+      max_parallelism: 2
       filter:
         states:
           - "In Progress"
@@ -159,35 +182,45 @@ orchestrator:
         remove_label: "PR Created"
         require_comment: "## Review: Clean"
         retry_on_comment_mismatch: true
+      on_failure:
+        add_label: "Automation Failed"
+        command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
     - name: develop-verify
       priority: 10
+      max_parallelism: 2
       filter:
         states:
           - "In Progress"
         require_labels:
           - "PR Reviewed"
         exclude_labels:
+          - "Requirements Verified"
           - "No Automation"
           - Blocked
           - Delayed
-          - "Requirements Verified"
       command: "/ticket:develop-verify {{.Issue.Identifier}}"
-      use_workspace: false
       use_worktree: true
+      max_retries: 1
       on_success:
         transition_state: "Ready for Review"
         add_label: "Requirements Verified"
         remove_label: "PR Reviewed"
         require_comment: "## Requirements: Verified"
+        mark_pr_ready: true
+      on_failure:
+        add_label: "Automation Failed"
+        remove_label: "PR Reviewed"
+        command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
     - name: bot-review-fix
-      priority: 15
       enabled: false
+      priority: 15
       max_retries: 3
+      max_parallelism: 2
       filter:
         states:
-          - "In Progress"
+          - "Ready for Review"
         require_labels:
           - "Requirements Verified"
         exclude_labels:
@@ -201,18 +234,23 @@ orchestrator:
       bot_review:
         reviewers:
           - copilot
+        required: false
         poll_interval: 60
         max_wait: 600
         max_fix_iterations: 3
       on_success:
-        transition_state: "Ready for Review"
         add_label: "Bot Review Fixed"
         remove_label: "Requirements Verified"
         require_comment: "## (Bot Review: Fixed|Review: Clean)"
         retry_on_comment_mismatch: true
+      on_failure:
+        add_label: "Automation Failed"
+        remove_label: "Requirements Verified"
+        command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
     - name: conflict-resolution
       priority: 20
+      max_parallelism: 1
       filter:
         states:
           - "Ready for Review"
@@ -226,6 +264,8 @@ orchestrator:
       use_workspace: false
       on_success:
         add_label: "Conflicts Resolved"
+      on_failure:
+        add_label: "Automation Failed"
 
 workspace:
   root: ~/workspaces/agent-skills
