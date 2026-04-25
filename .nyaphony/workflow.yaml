@@ -96,7 +96,7 @@ orchestrator:
       on_success:
         add_label: Planned
         remove_label: "Plan Drafted"
-        require_comment: "## Implementation Plan"
+        require_comment: "## Plan: Reviewed"
         retry_on_comment_mismatch: true
       on_failure:
         add_label: "Automation Failed"
