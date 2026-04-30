@@ -98,7 +98,6 @@ orchestrator:
         require_comment: "## Plan: Reviewed"
         retry_on_comment_mismatch: true
       on_failure:
-        remove_label: "Plan Drafted"
         command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
     - name: develop-impl
@@ -126,7 +125,6 @@ orchestrator:
         remove_label: Planned
         require_comment: "## Implementation: Done"
       on_failure:
-        remove_label: Planned
         command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
     - name: develop-fix-restart
@@ -204,7 +202,6 @@ orchestrator:
         require_comment: "## Requirements: Verified"
         mark_pr_ready: true
       on_failure:
-        remove_label: "PR Reviewed"
         command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
     - name: bot-review-fix
@@ -238,7 +235,6 @@ orchestrator:
         require_comment: "## (Bot Review: Fixed|Review: Clean)"
         retry_on_comment_mismatch: true
       on_failure:
-        remove_label: "Requirements Verified"
         command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
     - name: conflict-resolution
