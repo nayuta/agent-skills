@@ -43,7 +43,7 @@ coding_agent:
   model: claude-sonnet-4-6
   command: claude
   permission_mode: dangerously-skip-permissions
-  max_turns: 60
+  max_turns: 100
   stall_timeout: 300
   log_level: debug
 
@@ -53,6 +53,29 @@ orchestrator:
   max_retries: 1
   dispatch_order: ticket_priority
   workflows:
+    - name: complexity-assess
+      priority: -30
+      max_retries: 1
+      max_parallelism: 3
+      filter:
+        states:
+          - Todo
+        exclude_labels:
+          - "Complexity Assessed"
+          - "Plan Drafted"
+          - Planned
+          - "PR Created"
+          - "No Automation"
+          - Blocked
+          - Delayed
+      command: "/ticket:complexity-assess {{.Issue.Identifier}}"
+      use_workspace: false
+      on_success:
+        add_label: "Complexity Assessed"
+        require_comment: "## Complexity: Assessed"
+      on_failure:
+        command: "/ticket:failure-analysis {{.Issue.Identifier}}"
+
     - name: plan-draft
       priority: -20
       max_retries: 1
@@ -60,6 +83,8 @@ orchestrator:
       filter:
         states:
           - Todo
+        require_labels:
+          - "Complexity Assessed"
         exclude_labels:
           - "Plan Drafted"
           - Planned
@@ -156,7 +181,7 @@ orchestrator:
 
     - name: develop-review-fix
       priority: 5
-      max_retries: 3
+      max_retries: 2
       max_parallelism: 2
       filter:
         states:
@@ -168,9 +193,15 @@ orchestrator:
           - "No Automation"
           - Blocked
           - Delayed
-      command: "/ticket:develop-review-fix {{.Issue.Identifier}}"
       use_workspace: false
       use_worktree: true
+      steps:
+        - name: review
+          command: "/ticket:develop-review {{.Issue.Identifier}}"
+          max_retries: 1
+        - name: fix
+          command: "/ticket:develop-fix {{.Issue.Identifier}}"
+          max_retries: 1
       on_success:
         add_label: "PR Reviewed"
         remove_label: "PR Created"
@@ -237,6 +268,43 @@ orchestrator:
       on_failure:
         command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
+    # MUTUALLY EXCLUSIVE with bot-review-fix above.
+    # Only one of bot-review-fix / bot-review-fix-codex should be enabled at a time.
+    # They share the same priority, filters, and label transitions, so enabling both
+    # would cause them to compete for the same tickets.
+    - name: bot-review-fix-codex
+      enabled: false
+      priority: 15
+      max_retries: 3
+      max_parallelism: 2
+      filter:
+        states:
+          - "Ready for Review"
+        require_labels:
+          - "Requirements Verified"
+        exclude_labels:
+          - "No Automation"
+          - "Bot Review Fixed"
+          - Blocked
+          - Delayed
+      command: "/ticket:develop-bot-review-fix {{.Issue.Identifier}} --engine codex"
+      use_workspace: false
+      use_worktree: true
+      bot_review:
+        reviewers:
+          - copilot
+        required: false
+        poll_interval: 60
+        max_wait: 600
+        max_fix_iterations: 3
+      on_success:
+        add_label: "Bot Review Fixed"
+        remove_label: "Requirements Verified"
+        require_comment: "regex:(?m)## (Bot Review: Fixed \\(engine: codex\\)$|Review: Clean)"
+        retry_on_comment_mismatch: true
+      on_failure:
+        command: "/ticket:failure-analysis {{.Issue.Identifier}}"
+
     - name: conflict-resolution
       priority: 20
       max_parallelism: 1
@@ -253,6 +321,7 @@ orchestrator:
       use_workspace: false
       on_success:
         add_label: "Conflicts Resolved"
+
 workspace:
   root: ~/workspaces/agent-skills
   after_create: |
