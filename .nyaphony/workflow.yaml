@@ -44,7 +44,7 @@ coding_agent:
   command: claude
   permission_mode: dangerously-skip-permissions
   max_turns: 100
-  stall_timeout: 300
+  stall_timeout: 600
   log_level: debug
 
 orchestrator:
