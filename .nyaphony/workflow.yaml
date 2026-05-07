@@ -96,6 +96,7 @@ orchestrator:
       use_workspace: false
       on_success:
         add_label: "Plan Drafted"
+        remove_label: "Complexity Assessed"
         require_comment: "## Plan: Draft Ready"
       on_failure:
         command: "/ticket:failure-analysis {{.Issue.Identifier}}"
