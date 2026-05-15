@@ -70,6 +70,7 @@ orchestrator:
           - Delayed
       command: "/ticket:complexity-assess {{.Issue.Identifier}}"
       use_workspace: false
+      use_worktree: true
       on_success:
         add_label: "Complexity Assessed"
         require_comment: "## Complexity: Assessed"
@@ -94,6 +95,7 @@ orchestrator:
           - Delayed
       command: "/ticket:plan-draft {{.Issue.Identifier}}"
       use_workspace: false
+      use_worktree: true
       on_success:
         add_label: "Plan Drafted"
         remove_label: "Complexity Assessed"
@@ -118,6 +120,7 @@ orchestrator:
           - Delayed
       command: "/ticket:plan-review-fix {{.Issue.Identifier}}"
       use_workspace: false
+      use_worktree: true
       on_success:
         add_label: Planned
         remove_label: "Plan Drafted"
@@ -153,21 +156,26 @@ orchestrator:
       on_failure:
         command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
-    - name: develop-fix-restart
-      priority: 3
+    # Light review for Complexity: S/XS tasks - single reviewer (review-code only)
+    - name: develop-review-fix-light
+      priority: 4
       max_retries: 1
-      max_parallelism: 1
+      max_parallelism: 2
       filter:
         states:
           - Todo
+          - "In Progress"
         require_labels:
           - "PR Created"
+        require_any_labels:
+          - "Complexity: S"
+          - "Complexity: XS"
         exclude_labels:
           - "PR Reviewed"
           - "No Automation"
           - Blocked
           - Delayed
-      command: "/ticket:develop-review-fix {{.Issue.Identifier}}"
+      command: "/ticket:develop-review-fix-light {{.Issue.Identifier}}"
       use_workspace: false
       use_worktree: true
       on_start:
@@ -175,8 +183,7 @@ orchestrator:
       on_success:
         add_label: "PR Reviewed"
         remove_label: "PR Created"
-        require_comment: "## Review: Clean"
-        retry_on_comment_mismatch: true
+        require_comment: "## (Review: Clean|Review: Issues Fixed)"
       on_failure:
         command: "/ticket:failure-analysis {{.Issue.Identifier}}"
 
@@ -184,6 +191,7 @@ orchestrator:
       priority: 5
       max_retries: 2
       max_parallelism: 2
+      max_review_rounds: 3
       filter:
         states:
           - "In Progress"
@@ -194,6 +202,8 @@ orchestrator:
           - "No Automation"
           - Blocked
           - Delayed
+          - "Complexity: S"
+          - "Complexity: XS"
       use_workspace: false
       use_worktree: true
       steps:
@@ -210,6 +220,9 @@ orchestrator:
         retry_on_comment_mismatch: true
       on_failure:
         command: "/ticket:failure-analysis {{.Issue.Identifier}}"
+      on_non_convergence:
+        add_label: "Review Non-Convergent"
+        transition_state: "In Review"
 
     - name: develop-verify
       priority: 10
