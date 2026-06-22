@@ -14,7 +14,7 @@ issue_tracker:
   candidate_states:
     - Todo
     - "In Progress"
-    - "Ready for Review"
+    - "In Review"
   terminal_states:
     - Done
     - Canceled
@@ -44,7 +44,7 @@ coding_agent:
   command: claude
   permission_mode: dangerously-skip-permissions
   max_turns: 100
-  stall_timeout: 600
+  stall_timeout: 300
   log_level: debug
 
 orchestrator:
@@ -98,7 +98,6 @@ orchestrator:
       use_worktree: true
       on_success:
         add_label: "Plan Drafted"
-        remove_label: "Complexity Assessed"
         require_comment: "## Plan: Draft Ready"
       on_failure:
         command: "/ticket:failure-analysis {{.Issue.Identifier}}"
@@ -241,7 +240,7 @@ orchestrator:
       use_worktree: true
       max_retries: 1
       on_success:
-        transition_state: "Ready for Review"
+        transition_state: "In Review"
         add_label: "Requirements Verified"
         remove_label: "PR Reviewed"
         require_comment: "## Requirements: Verified"
@@ -256,7 +255,7 @@ orchestrator:
       max_parallelism: 2
       filter:
         states:
-          - "Ready for Review"
+          - "In Review"
         require_labels:
           - "Requirements Verified"
         exclude_labels:
@@ -293,7 +292,7 @@ orchestrator:
       max_parallelism: 2
       filter:
         states:
-          - "Ready for Review"
+          - "In Review"
         require_labels:
           - "Requirements Verified"
         exclude_labels:
@@ -324,7 +323,7 @@ orchestrator:
       max_parallelism: 1
       filter:
         states:
-          - "Ready for Review"
+          - "In Review"
         exclude_labels:
           - "No Automation"
           - Blocked
